@@ -41,8 +41,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
     } catch (e) {
       if (!mounted) return;
+      final message = e.toString().replaceFirst('Exception: ', '').replaceFirst('TimeoutException after', 'Request timed out after');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(content: Text(message.isNotEmpty ? message : 'Unable to send OTP right now. Please try again.')),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);

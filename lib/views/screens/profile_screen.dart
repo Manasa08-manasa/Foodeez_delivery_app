@@ -4,6 +4,7 @@ import '../../data/mock_data.dart';
 import '../../models/app_models.dart';
 import '../../controllers/app_controller.dart';
 import '../../core/theme.dart';
+import '../../services/auth_service.dart';
 import '../widgets/common.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -274,7 +275,29 @@ class _DocumentCardState extends ConsumerState<_DocumentCard> {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
-        onPressed: () => app.uploadDocument(d.id),
+        onPressed: () async {
+          final accessToken = app.accessToken;
+          if (accessToken == null || accessToken.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please sign in before uploading documents')));
+            return;
+          }
+
+          try {
+            await AuthService().uploadSignupDocuments(
+              accessToken: accessToken,
+              partnerId: app.partnerId ?? '',
+              documentType: d.id,
+              documentNumber: app.documentNumbers[d.id] ?? '',
+              fileName: '${d.id}.jpg',
+            );
+            app.uploadDocument(d.id);
+          } catch (e) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+            );
+          }
+        },
         icon: const Icon(Icons.upload_file_rounded, size: 16, color: AppColors.accent),
         label: Text('Upload document photo', style: AppText.body(size: 13, weight: FontWeight.w700, color: AppColors.accent)),
         style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 11), side: const BorderSide(color: AppColors.dividerBorder, width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),

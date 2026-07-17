@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../controllers/app_controller.dart';
 import '../../core/theme.dart';
 import '../../services/auth_service.dart';
 import '../widgets/common.dart';
 
+/// Mirrors https://int.foodeez.in/delivery/auth/signup's own 5-step
+/// stepper: Email -> OTP -> Location -> Vehicle -> Documents.
+/// Documents is handled the same way the web app's "pending review" state
+/// works today in this app: right after account creation the rider is
+/// dropped onto the document-upload screen (see AppState.startNewApplication
+/// and ProfileScreen), so it isn't a form step in here.
 class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
 
@@ -13,139 +20,227 @@ class SignupScreen extends ConsumerStatefulWidget {
 }
 
 class _SignupScreenState extends ConsumerState<SignupScreen> {
-  final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _otpCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
-  final _confirmPasswordCtrl = TextEditingController();
-  final _cityCtrl = TextEditingController(text: 'Hyderabad');
 
-  String _vehicle = 'Scooter';
+  final _nameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _cityCtrl = TextEditingController();
+  final _stateCtrl = TextEditingController();
+  String _address = '';
+  double? _latitude;
+  double? _longitude;
+
+  final _vehicleNumberCtrl = TextEditingController();
+  final _licenseNumberCtrl = TextEditingController();
+
   bool _sendingOtp = false;
+  bool _verifyingOtp = false;
+  bool _locating = false;
   bool _creatingAccount = false;
   bool _otpSent = false;
+  bool _otpVerified = false;
+  int _step = 0;
+
+  static const int _stepEmail = 0;
+  static const int _stepOtp = 1;
+  static const int _stepLocation = 2;
+  static const int _stepVehicle = 3;
+  static const int _lastStep = _stepVehicle;
 
   static final _emailRegex = RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}$');
 
   static const _vehicles = [
-    ('Bicycle', Icons.pedal_bike_outlined),
-    ('Scooter', Icons.moped_outlined),
-    ('Bike', Icons.two_wheeler_outlined),
-    ('Car', Icons.directions_car_outlined),
+    ('BICYCLE', Icons.pedal_bike_outlined),
+    ('SCOOTER', Icons.moped_outlined),
+    ('MOTORCYCLE', Icons.two_wheeler_outlined),
+    ('CAR', Icons.directions_car_outlined),
   ];
+
+  String _vehicle = 'SCOOTER';
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
     _emailCtrl.dispose();
     _otpCtrl.dispose();
-    _passwordCtrl.dispose();
-    _confirmPasswordCtrl.dispose();
+    _nameCtrl.dispose();
+    _phoneCtrl.dispose();
     _cityCtrl.dispose();
+    _stateCtrl.dispose();
+    _vehicleNumberCtrl.dispose();
+    _licenseNumberCtrl.dispose();
     super.dispose();
   }
+
+  void _toast(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String _friendlyError(Object e) {
+    final message = e.toString().replaceFirst('Exception: ', '').replaceFirst('TimeoutException after', 'Request timed out after');
+    return message.isNotEmpty ? message : 'Something went wrong. Please try again.';
+  }
+
+  // ---- Step 1: Email -> send-otp ----
 
   Future<void> _sendOtp() async {
     final email = _emailCtrl.text.trim();
 
     if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter email")),
-      );
+      _toast('Please enter your email');
       return;
     }
-
     if (!_emailRegex.hasMatch(email)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Enter a valid email")),
-      );
+      _toast('Enter a valid email');
       return;
     }
 
     setState(() => _sendingOtp = true);
     try {
-      // Verification is sent via the same email-OTP endpoint used at login —
-      // there's no separate signup/register endpoint on the backend yet.
-      await AuthService().sendLoginOtp(email: email);
+      await AuthService().sendOtp(email: email);
       if (!mounted) return;
-      setState(() => _otpSent = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("OTP sent successfully")),
-      );
+      setState(() {
+        _otpSent = true;
+        _step = _stepOtp;
+      });
+      _toast('OTP sent successfully');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-      );
+      _toast(_friendlyError(e));
     } finally {
       if (mounted) setState(() => _sendingOtp = false);
     }
   }
 
-  Future<void> _submit(AppState app) async {
-    if (_nameCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter full name")),
-      );
-      return;
-    }
+  // ---- Step 2: OTP -> verify-otp ----
 
-    final email = _emailCtrl.text.trim();
-    if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter email")),
-      );
+  Future<void> _verifyOtpAndContinue() async {
+    if (!_otpSent) {
+      _toast('Please request an OTP first');
       return;
     }
-    if (!_emailRegex.hasMatch(email)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Enter a valid email")),
-      );
-      return;
-    }
-
     final otp = _otpCtrl.text.trim();
     if (otp.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter the OTP sent to your email")),
-      );
-      return;
-    }
-    if (!_otpSent) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please request an OTP first")),
-      );
+      _toast('Please enter the OTP sent to your email');
       return;
     }
 
-    if (_passwordCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter password")),
-      );
+    setState(() => _verifyingOtp = true);
+    try {
+      await AuthService().verifyOtp(email: _emailCtrl.text.trim(), otp: otp);
+      if (!mounted) return;
+      setState(() {
+        _otpVerified = true;
+        _step = _stepLocation;
+      });
+      // Best-effort: prompt for location as soon as we land on the
+      // Location step, same as the web app does.
+      _useCurrentLocation();
+    } catch (e) {
+      if (!mounted) return;
+      _toast(_friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _verifyingOtp = false);
+    }
+  }
+
+  // ---- Step 3: Location -> geolocation + nominatim reverse geocode ----
+
+  Future<void> _useCurrentLocation() async {
+    setState(() => _locating = true);
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _toast('Please turn on location services to auto-fill your city');
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        _toast('Location permission is needed to confirm your city');
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition();
+      _latitude = position.latitude;
+      _longitude = position.longitude;
+
+      final details = await AuthService().reverseGeocodeDetailed(lat: position.latitude, lon: position.longitude);
+      if (!mounted) return;
+      setState(() {
+        _address = details['address'] ?? _address;
+        if ((details['city'] ?? '').isNotEmpty) _cityCtrl.text = details['city']!;
+        if ((details['state'] ?? '').isNotEmpty) _stateCtrl.text = details['state']!;
+      });
+    } catch (_) {
+      // Silent - rider can still type city/state manually.
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  bool _validateLocationStep() {
+    if (_nameCtrl.text.trim().isEmpty) {
+      _toast('Please enter your full name');
+      return false;
+    }
+    final phone = _phoneCtrl.text.trim();
+    if (phone.isEmpty) {
+      _toast('Please enter your phone number');
+      return false;
+    }
+    if (phone.length < 10) {
+      _toast('Please enter a valid phone number');
+      return false;
+    }
+    if (_cityCtrl.text.trim().isEmpty) {
+      _toast('Please enter your city');
+      return false;
+    }
+    if (_stateCtrl.text.trim().isEmpty) {
+      _toast('Please enter your state');
+      return false;
+    }
+    return true;
+  }
+
+  // ---- Step 4: Vehicle -> final signup ----
+
+  Future<void> _createAccount(AppState app) async {
+    final vehicleNumber = _vehicleNumberCtrl.text.trim();
+    if (vehicleNumber.isEmpty) {
+      _toast('Please enter your vehicle number');
       return;
     }
-
-    if (_confirmPasswordCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please confirm password")),
-      );
+    final licenseNumber = _licenseNumberCtrl.text.trim();
+    if (licenseNumber.isEmpty) {
+      _toast('Please enter your license number');
       return;
     }
-
-    if (_passwordCtrl.text != _confirmPasswordCtrl.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Passwords do not match")),
-      );
+    if (!_otpVerified) {
+      _toast('Please verify your email OTP first');
       return;
     }
 
     setState(() => _creatingAccount = true);
     try {
-      // Confirms the email OTP against the live backend — same endpoint used
-      // for login, since there's no dedicated signup/register endpoint yet.
-      // A successful response means the email is verified and returns the
-      // partner's real profile + access token.
-      final authResponse = await AuthService().verifyLoginOtp(email: email, otp: otp);
+      final authResponse = await AuthService().signup(
+        name: _nameCtrl.text.trim(),
+        email: _emailCtrl.text.trim(),
+        phone: _phoneCtrl.text.trim(),
+        city: _cityCtrl.text.trim(),
+        state: _stateCtrl.text.trim(),
+        vehicleType: _vehicle,
+        vehicleNumber: vehicleNumber,
+        licenseNumber: licenseNumber,
+        otp: _otpCtrl.text.trim(),
+        address: _address,
+        latitude: _latitude,
+        longitude: _longitude,
+      );
       if (!mounted) return;
 
       app.setAuthenticatedUser(
@@ -157,20 +252,49 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         vehicleType: authResponse.partner.vehicleType,
       );
 
+      // Same as the web app: account created -> straight to document
+      // verification (this app's stand-in for the web's "Documents" step).
       app.startNewApplication();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-      );
+      _toast(_friendlyError(e));
     } finally {
       if (mounted) setState(() => _creatingAccount = false);
     }
   }
 
+  Future<void> _onContinue(AppState app) async {
+    switch (_step) {
+      case _stepEmail:
+        await _sendOtp();
+        return;
+      case _stepOtp:
+        await _verifyOtpAndContinue();
+        return;
+      case _stepLocation:
+        if (_validateLocationStep()) {
+          setState(() => _step = _stepVehicle);
+        }
+        return;
+      case _stepVehicle:
+        await _createAccount(app);
+        return;
+    }
+  }
+
+  void _goBackAStep() {
+    final app = ref.read(appControllerProvider);
+    if (_step == _stepEmail) {
+      app.back();
+      return;
+    }
+    setState(() => _step -= 1);
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = ref.read(appControllerProvider);
+    final busy = _sendingOtp || _verifyingOtp || _creatingAccount;
 
     return Container(
       color: Colors.white,
@@ -182,13 +306,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             children: [
               ScreenHeader(
                 title: 'Sign up to deliver',
-                onBack: app.back,
+                onBack: _goBackAStep,
               ),
 
               Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 18),
+                padding: const EdgeInsets.only(left: 4, bottom: 12),
                 child: Text(
-                  "A few details and we'll get your application to our onboarding team.",
+                  "Get verified. Start delivering. Signup requests are approved by our operations team.",
                   style: AppText.body(
                     size: 13,
                     color: AppColors.bodyGrey,
@@ -197,187 +321,210 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
               ),
 
-              _label('FULL NAME'),
-              _field(
-                controller: _nameCtrl,
-                hint: 'As per your ID proof',
-              ),
-
-              const SizedBox(height: 14),
-
-              _label('EMAIL ADDRESS'),
-              _field(
-                controller: _emailCtrl,
-                hint: 'Enter your email',
-                keyboardType: TextInputType.emailAddress,
-              ),
-
-              const SizedBox(height: 16),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 16),
+                child: Text(
+                  'Step ${_step + 1} of 5 · ${_stepLabel(_step)}',
+                  style: AppText.body(
+                    size: 12,
+                    weight: FontWeight.w700,
+                    color: AppColors.accent,
                   ),
-                  onPressed: _sendingOtp ? null : _sendOtp,
-                  child: _sendingOtp
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
-                        )
-                      : Text(
-                          _otpSent ? "Resend OTP" : "Send OTP",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
                 ),
               ),
 
-              const SizedBox(height: 14),
-
-              _label('EMAIL OTP'),
-              _field(
-                controller: _otpCtrl,
-                hint: 'Enter OTP',
-              ),
-
-              const SizedBox(height: 14),
-
-              _label('PASSWORD'),
-              _field(
-                controller: _passwordCtrl,
-                hint: 'Enter Password',
-                obscure: true,
-              ),
-
-              const SizedBox(height: 14),
-
-              _label('CONFIRM PASSWORD'),
-              _field(
-                controller: _confirmPasswordCtrl,
-                hint: 'Confirm Password',
-                obscure: true,
-              ),
-
-              const SizedBox(height: 14),
-
-              _label('CITY'),
-              _field(
-                controller: _cityCtrl,
-                hint: "City you'll deliver in",
-              ),
-              
-              const SizedBox(height: 14),
-
-              _label('VEHICLE TYPE'),
-
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: _vehicles.map((v) {
-                  final selected = _vehicle == v.$1;
-
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _vehicle = v.$1;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? AppColors.accent
-                            : Colors.white,
-                        border: Border.all(
-                          color: selected
-                              ? AppColors.accent
-                              : AppColors.dividerBorder,
-                          width: 1.5,
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            v.$2,
-                            size: 16,
-                            color: selected
-                                ? Colors.white
-                                : AppColors.ink,
+              if (_step == _stepEmail) ...[
+                _label('EMAIL ADDRESS'),
+                _field(
+                  controller: _emailCtrl,
+                  hint: 'Enter your email',
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Text(
+                    'An OTP will be sent to this email to verify your account.',
+                    style: AppText.body(size: 12, color: AppColors.lightGreyText, height: 1.4),
+                  ),
+                ),
+              ] else if (_step == _stepOtp) ...[
+                _label('EMAIL OTP'),
+                _field(
+                  controller: _otpCtrl,
+                  hint: 'Enter OTP',
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 14),
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: GestureDetector(
+                    onTap: _sendingOtp ? null : _sendOtp,
+                    child: Text(
+                      _sendingOtp ? 'Resending…' : 'Resend OTP',
+                      style: AppText.body(size: 13, weight: FontWeight.w700, color: AppColors.accent),
+                    ),
+                  ),
+                ),
+              ] else if (_step == _stepLocation) ...[
+                _label('FULL NAME'),
+                _field(
+                  controller: _nameCtrl,
+                  hint: 'As per your ID proof',
+                ),
+                const SizedBox(height: 14),
+                _label('PHONE NUMBER'),
+                _field(
+                  controller: _phoneCtrl,
+                  hint: 'Enter phone number',
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 14),
+                GestureDetector(
+                  onTap: _locating ? null : _useCurrentLocation,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.plumTint,
+                      border: Border.all(color: AppColors.plumTintBorder, width: 1.5),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        _locating
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
+                              )
+                            : const Icon(Icons.my_location, size: 18, color: AppColors.accent),
+                        const SizedBox(width: 11),
+                        Expanded(
+                          child: Text(
+                            _locating ? 'Detecting your location…' : 'Use current location to auto-fill city & state',
+                            style: AppText.body(size: 12.5, weight: FontWeight.w700, color: AppColors.accent),
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            v.$1,
-                            style: AppText.body(
-                              size: 13.5,
-                              weight: FontWeight.w700,
-                              color: selected
-                                  ? Colors.white
-                                  : AppColors.ink,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _label('CITY'),
+                _field(
+                  controller: _cityCtrl,
+                  hint: "City you'll deliver in",
+                ),
+                const SizedBox(height: 14),
+                _label('STATE'),
+                _field(
+                  controller: _stateCtrl,
+                  hint: 'Enter state',
+                ),
+              ] else if (_step == _stepVehicle) ...[
+                _label('VEHICLE TYPE'),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: _vehicles.map((v) {
+                    final selected = _vehicle == v.$1;
+
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _vehicle = v.$1;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: selected ? AppColors.accent : Colors.white,
+                          border: Border.all(
+                            color: selected ? AppColors.accent : AppColors.dividerBorder,
+                            width: 1.5,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              v.$2,
+                              size: 16,
+                              color: selected ? Colors.white : AppColors.ink,
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-
-              const SizedBox(height: 22),
-
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 15,
-                  vertical: 13,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.plumTint,
-                  border: Border.all(
-                    color: AppColors.plumTintBorder,
-                    width: 1.5,
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.description_outlined,
-                      size: 18,
-                      color: AppColors.accent,
-                    ),
-                    const SizedBox(width: 11),
-                    Expanded(
-                      child: Text(
-                        "After signing up, you'll upload your driving licence, vehicle RC and insurance for verification.",
-                        style: AppText.body(
-                          size: 12,
-                          weight: FontWeight.w600,
-                          color: AppColors.accent,
-                          height: 1.4,
+                            const SizedBox(width: 8),
+                            Text(
+                              v.$1,
+                              style: AppText.body(
+                                size: 13.5,
+                                weight: FontWeight.w700,
+                                color: selected ? Colors.white : AppColors.ink,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
+                    );
+                  }).toList(),
                 ),
-              ),
+                const SizedBox(height: 14),
+                _label('VEHICLE NUMBER'),
+                _field(
+                  controller: _vehicleNumberCtrl,
+                  hint: 'TS09AB1234',
+                ),
+                const SizedBox(height: 14),
+                _label('LICENSE NUMBER'),
+                _field(
+                  controller: _licenseNumberCtrl,
+                  hint: 'Driving License Number',
+                ),
+                const SizedBox(height: 22),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 15,
+                    vertical: 13,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.plumTint,
+                    border: Border.all(
+                      color: AppColors.plumTintBorder,
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.description_outlined,
+                        size: 18,
+                        color: AppColors.accent,
+                      ),
+                      const SizedBox(width: 11),
+                      Expanded(
+                        child: Text(
+                          "Step 5 · Documents: after you create your account, you'll upload your driving licence, vehicle RC and insurance for verification.",
+                          style: AppText.body(
+                            size: 12,
+                            weight: FontWeight.w600,
+                            color: AppColors.accent,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 20),
 
               GestureDetector(
-                onTap: _creatingAccount ? null : () => _submit(app),
+                onTap: busy ? null : () => _onContinue(app),
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 17),
@@ -393,14 +540,17 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     ],
                   ),
                   alignment: Alignment.center,
-                  child: _creatingAccount
+                  child: busy
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: Colors.white,
+                          ),
                         )
                       : Text(
-                          'Create account',
+                          _step < _lastStep ? 'Continue' : 'Create account',
                           style: AppText.body(
                             size: 16,
                             weight: FontWeight.w700,
@@ -448,6 +598,21 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         ),
       ),
     );
+  }
+
+  String _stepLabel(int step) {
+    switch (step) {
+      case _stepEmail:
+        return 'Email';
+      case _stepOtp:
+        return 'OTP';
+      case _stepLocation:
+        return 'Location';
+      case _stepVehicle:
+        return 'Vehicle';
+      default:
+        return '';
+    }
   }
 
   Widget _label(String text) {
