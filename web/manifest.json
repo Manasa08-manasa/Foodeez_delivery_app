@@ -3,7 +3,7 @@
     "short_name": "Foodeez Rider",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0D2D41",
+    "background_color": "#FFFFFF",
     "theme_color": "#0D2D41",
     "description": "Foodeez delivery rider app — ride, deliver, earn.",
     "orientation": "portrait-primary",

@@ -52,6 +52,26 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.4
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/images/delivery-partner-logo.png
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: assets/images/delivery-partner-logo.png
+  adaptive_icon_foreground_inset: 18
+  web:
+    generate: true
+    image_path: assets/images/delivery-partner-logo.png
+    background_color: "#FFFFFF"
+    theme_color: "#0D2D41"
+
+flutter_native_splash:
+  color: "#0D2D41"
+  android_12:
+    color: "#0D2D41"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -65,6 +85,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/images/delivery-partner-logo.png
     - assets/images/foodeez-mark.png
     - assets/images/foodeez-full.png
 

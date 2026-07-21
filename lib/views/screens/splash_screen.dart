@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/responsive.dart';
 import '../../core/theme.dart';
 
-/// Branded splash screen — navy grid background, gold route path, pin logo, RIDER title.
+/// Branded splash — navy grid, animated gold route, pin marker, RIDER title.
 class SplashScreen extends StatefulWidget {
   final VoidCallback onComplete;
 
@@ -15,23 +15,40 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _fadeIn;
   late final Animation<double> _pathProgress;
+  late final Animation<double> _pinScale;
   late final Animation<double> _textSlide;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200));
-    _fadeIn = CurvedAnimation(parent: _controller, curve: const Interval(0, 0.35, curve: Curves.easeOut));
-    _pathProgress = CurvedAnimation(parent: _controller, curve: const Interval(0.1, 0.7, curve: Curves.easeInOutCubic));
-    _textSlide = CurvedAnimation(parent: _controller, curve: const Interval(0.45, 0.85, curve: Curves.easeOutCubic));
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2800),
+    );
+    _fadeIn = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0, 0.25, curve: Curves.easeOut),
+    );
+    _pathProgress = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.05, 0.72, curve: Curves.easeInOutCubic),
+    );
+    _pinScale = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.55, 0.82, curve: Curves.elasticOut),
+    );
+    _textSlide = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.68, 1, curve: Curves.easeOutCubic),
+    );
 
     _controller.forward();
-    // Keep the branded splash visible long enough on slower devices.
-    Future<void>.delayed(const Duration(milliseconds: 3400), () {
+    Future<void>.delayed(const Duration(milliseconds: 3600), () {
       if (mounted) widget.onComplete();
     });
   }
@@ -44,9 +61,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    final graphicSize = Responsive.isTablet(context) ? 320.0 : 260.0;
-    final titleSize = Responsive.fontSize(context, 52);
-    final taglineSize = Responsive.fontSize(context, 11);
+    final graphicSize = Responsive.isTablet(context) ? 320.0 : 280.0;
+    final titleSize = Responsive.fontSize(context, 54);
+    final taglineSize = Responsive.fontSize(context, 11.5);
 
     return Scaffold(
       backgroundColor: AppColors.accent,
@@ -64,28 +81,63 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     const Spacer(flex: 2),
                     SizedBox(
                       width: graphicSize,
-                      height: graphicSize * 0.78,
+                      height: graphicSize * 0.82,
                       child: CustomPaint(
-                        painter: _SplashRoutePainter(progress: _pathProgress.value),
-                        child: Align(
-                          alignment: const Alignment(0.18, -0.62),
-                          child: _PinLogo(size: graphicSize * 0.44),
+                        painter: _SplashRoutePainter(
+                          progress: _pathProgress.value,
+                        ),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Align(
+                              alignment: const Alignment(0.14, -0.58),
+                              child: Transform.scale(
+                                scale: 0.85 + (_pinScale.value * 0.15),
+                                child: Opacity(
+                                  opacity: _pathProgress.value.clamp(0, 1),
+                                  child: _PinLogo(size: graphicSize * 0.34),
+                                ),
+                              ),
+                            ),
+                            if (_pathProgress.value > 0.35 &&
+                                _pathProgress.value < 0.95)
+                              Align(
+                                alignment: const Alignment(0.52, -0.42),
+                                child: SizedBox(
+                                  width: 28,
+                                  height: 28,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.2,
+                                    valueColor: AlwaysStoppedAnimation(
+                                      Colors.white.withValues(alpha: 0.35),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ),
                     const Spacer(flex: 1),
                     Transform.translate(
-                      offset: Offset(0, (1 - _textSlide.value) * 14),
+                      offset: Offset(0, (1 - _textSlide.value) * 18),
                       child: Opacity(
                         opacity: _textSlide.value,
                         child: Column(
                           children: [
                             ShaderMask(
                               blendMode: BlendMode.srcIn,
-                              shaderCallback: (bounds) => AppColors.goldTextGradient.createShader(bounds),
+                              shaderCallback: (bounds) => AppColors
+                                  .goldTextGradient
+                                  .createShader(bounds),
                               child: Text(
                                 'RIDER',
-                                style: AppText.display(size: titleSize, weight: FontWeight.w900, color: Colors.white, letterSpacing: 2),
+                                style: AppText.display(
+                                  size: titleSize,
+                                  weight: FontWeight.w900,
+                                  color: Colors.white,
+                                  letterSpacing: 2,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 10),
@@ -94,15 +146,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                               style: AppText.body(
                                 size: taglineSize,
                                 weight: FontWeight.w600,
-                                color: Colors.white.withValues(alpha: 0.85),
-                                letterSpacing: 2.8,
+                                color: Colors.white.withValues(alpha: 0.82),
+                                letterSpacing: 2.6,
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                    SizedBox(height: Responsive.isTablet(context) ? 60 : 44),
+                    SizedBox(height: Responsive.isTablet(context) ? 64 : 48),
                   ],
                 ),
               ),
@@ -127,23 +179,25 @@ class _PinLogo extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Positioned.fill(child: CustomPaint(painter: _PinMarkerPainter())),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.terrain, size: size * 0.18, color: Colors.white.withValues(alpha: 0.9)),
-              SizedBox(height: size * 0.03),
-              Text(
-                'FooI',
-                style: TextStyle(
-                  fontFamily: 'Plus Jakarta Sans',
-                  fontSize: size * 0.13,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white.withValues(alpha: 0.92),
-                  letterSpacing: 0.2,
+          CustomPaint(size: Size(size, size), painter: _PinMarkerPainter()),
+          Container(
+            width: size * 0.38,
+            height: size * 0.38,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.accentDeep,
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                'assets/images/foodeez-mark.png',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Icon(
+                  Icons.location_on,
+                  size: size * 0.2,
+                  color: Colors.white.withValues(alpha: 0.9),
                 ),
               ),
-            ],
+            ),
           ),
         ],
       ),
@@ -167,10 +221,16 @@ class _SplashGridPainter extends CustomPainter {
     }
 
     final glow = Paint()
-      ..shader = RadialGradient(
-        colors: [Colors.white.withValues(alpha: 0.06), Colors.transparent],
-        stops: const [0, 1],
-      ).createShader(Rect.fromCircle(center: Offset(size.width * 0.5, size.height * 0.38), radius: size.width * 0.55));
+      ..shader =
+          RadialGradient(
+            colors: [Colors.white.withValues(alpha: 0.06), Colors.transparent],
+            stops: const [0, 1],
+          ).createShader(
+            Rect.fromCircle(
+              center: Offset(size.width * 0.5, size.height * 0.38),
+              radius: size.width * 0.55,
+            ),
+          );
     canvas.drawRect(Offset.zero & size, glow);
   }
 
@@ -186,14 +246,14 @@ class _SplashRoutePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final path = Path()
-      ..moveTo(size.width * 0.08, size.height * 0.86)
+      ..moveTo(size.width * 0.08, size.height * 0.88)
       ..cubicTo(
         size.width * 0.04,
-        size.height * 0.60,
+        size.height * 0.62,
         size.width * 0.52,
-        size.height * 0.70,
+        size.height * 0.72,
         size.width * 0.58,
-        size.height * 0.24,
+        size.height * 0.22,
       );
 
     final metrics = path.computeMetrics().first;
@@ -203,7 +263,7 @@ class _SplashRoutePainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 14
       ..strokeCap = StrokeCap.round
-      ..color = AppColors.gold.withValues(alpha: 0.2)
+      ..color = AppColors.gold.withValues(alpha: 0.22)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
     canvas.drawPath(extractPath, glowPaint);
 
@@ -217,42 +277,25 @@ class _SplashRoutePainter extends CustomPainter {
     canvas.drawPath(extractPath, strokePaint);
 
     if (progress > 0.02) {
-      final start = metrics.getTangentForOffset(metrics.length * 0.0)?.position ?? Offset.zero;
+      final start = metrics.getTangentForOffset(0)?.position ?? Offset.zero;
       canvas.drawCircle(start, 8, Paint()..color = AppColors.gold);
       canvas.drawCircle(start, 4, Paint()..color = AppColors.goldLight);
+    }
+
+    if (progress > 0.92) {
+      final end =
+          metrics.getTangentForOffset(metrics.length)?.position ?? Offset.zero;
+      canvas.drawCircle(
+        end,
+        6,
+        Paint()..color = AppColors.goldLight.withValues(alpha: 0.9),
+      );
     }
   }
 
   @override
-  bool shouldRepaint(covariant _SplashRoutePainter oldDelegate) => oldDelegate.progress != progress;
-}
-
-class _PinTailPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = Path()
-      ..moveTo(size.width * 0.5, 0)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-
-    final paint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [AppColors.gold, AppColors.goldDeep],
-      ).createShader(Offset.zero & size);
-
-    canvas.save();
-    canvas.translate(size.width * 0.5, 0);
-    canvas.rotate(math.pi);
-    canvas.translate(-size.width * 0.5, -size.height);
-    canvas.drawPath(path, paint);
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _SplashRoutePainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }
 
 class _PinMarkerPainter extends CustomPainter {
@@ -269,13 +312,6 @@ class _PinMarkerPainter extends CustomPainter {
       ..quadraticBezierTo(w * 0.12, h * 0.20, w * 0.5, h * 0.01)
       ..close();
 
-    // Dark center.
-    final fillPaint = Paint()
-      ..style = PaintingStyle.fill
-      ..color = AppColors.accentDeep;
-    canvas.drawPath(pin, fillPaint);
-
-    // Gold border.
     final borderPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = math.max(3.0, w * 0.055)
@@ -288,13 +324,6 @@ class _PinMarkerPainter extends CustomPainter {
       ).createShader(Rect.fromLTWH(0, 0, w, h));
 
     canvas.drawPath(pin, borderPaint);
-
-    // Subtle inner ring.
-    final innerRing = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(1.3, w * 0.03)
-      ..color = Colors.white.withValues(alpha: 0.08);
-    canvas.drawPath(pin.shift(Offset(w * 0.0, h * 0.0)), innerRing);
   }
 
   @override

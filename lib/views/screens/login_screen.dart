@@ -6,6 +6,7 @@ import '../../controllers/app_controller.dart';
 import '../../core/theme.dart';
 import '../../core/responsive.dart';
 import '../../services/auth_service.dart';
+import '../widgets/foodeez_logo.dart';
 import 'otp_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -75,28 +76,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Container(
-                            width: 152,
-                            height: 152,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: RadialGradient(
-                                colors: [
-                                  AppColors.gold.withValues(alpha: 0.28),
-                                  Colors.transparent,
-                                ],
-                              ),
-                            ),
-                          ),
-                          Image.asset(
-                            'assets/images/foodeez-mark.png',
-                            width: 104,
-                          ),
-                        ],
-                      ),
+                      const FoodeezLogo(),
                       const SizedBox(height: 20),
 
                       RichText(
