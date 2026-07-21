@@ -60,6 +60,9 @@ class OrderLine {
 /// The active delivery request — accepted from the incoming-request alert
 /// and driven through [DeliveryStage] on the Trip screen.
 class DeliveryRequest {
+  /// Backend assignment id (DeliveryAssignmentEntity.id) used for claim/reject/status updates.
+  final String assignmentId;
+
   final String orderId;
   final String restaurantName;
   final String restaurantAddress;
@@ -72,7 +75,13 @@ class DeliveryRequest {
   final PaymentMethod paymentMethod;
   final List<OrderLine> items;
 
+  /// Time limit for accepting this assignment (used for alert countdown).
+  ///
+  /// When null, the app falls back to the legacy `alertCountdown` default.
+  final DateTime? acceptDeadlineAt;
+
   const DeliveryRequest({
+    required this.assignmentId,
     required this.orderId,
     required this.restaurantName,
     required this.restaurantAddress,
@@ -84,6 +93,7 @@ class DeliveryRequest {
     required this.orderTotal,
     required this.paymentMethod,
     required this.items,
+    this.acceptDeadlineAt,
   });
 }
 

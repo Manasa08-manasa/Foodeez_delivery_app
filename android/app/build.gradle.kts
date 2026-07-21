@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.foodeez_delivery"
+    namespace = "com.foodeez.foodeez_delivery"
 
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
@@ -15,7 +15,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.foodeez_delivery"
+        applicationId = "com.foodeez.foodeez_delivery"
 
         // Google Maps requires at least SDK 21
         minSdk = flutter.minSdkVersion

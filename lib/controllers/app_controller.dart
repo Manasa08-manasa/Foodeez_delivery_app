@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/mock_data.dart';
 import '../models/app_models.dart';
+import '../services/delivery_assignments_api.dart';
+import '../services/delivery_partners_api.dart';
+import '../services/delivery_socket_service.dart';
 
 /// Mirrors the design prototype's `Component` state machine: a screen stack
 /// for push/pop flows, plus a "tab reset" mode for the 4 bottom-dock destinations.
@@ -109,6 +112,9 @@ class AppState extends ChangeNotifier {
   bool codCollected = false;
   DeliveryRequest? activeRequest;
 
+  DeliverySocketService? _deliverySocket;
+  String? _deliverySocketPartnerId;
+
   String earnPeriod = 'today';
 
   final Map<String, bool> prefs = {'longTrips': true, 'autoAccept': false, 'cashOnly': false};
@@ -117,7 +123,7 @@ class AppState extends ChangeNotifier {
   /// running for this rider — riders cannot activate this themselves. Null
   /// means no campaign is running, and the Home screen shows nothing in its
   /// place (Recent trips simply moves up to fill the space).
-  IncentiveOffer? incentiveOffer = demoIncentive;
+  IncentiveOffer? incentiveOffer;
 
   void setIncentiveOffer(IncentiveOffer? offer) {
     incentiveOffer = offer;
@@ -127,6 +133,9 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _alertTimer?.cancel();
+    _deliverySocket?.disconnect();
+    _deliverySocket = null;
+    _deliverySocketPartnerId = null;
     super.dispose();
   }
 
@@ -159,6 +168,10 @@ class AppState extends ChangeNotifier {
   void toHelp() => go('help');
 
   void logout() {
+    _deliverySocket?.disconnect();
+    _deliverySocket = null;
+    _deliverySocketPartnerId = null;
+
     accessToken = null;
     partnerId = null;
     partnerName = null;
@@ -178,6 +191,9 @@ class AppState extends ChangeNotifier {
     this.vehicleType = vehicleType;
     accountStatus = AccountStatus.active;
     notifyListeners();
+
+    // If the user is already marked online, start listening immediately for new orders.
+    _maybeStartDeliveryRealtime();
   }
 
   static const _hideTabScreens = {'login', 'signup', 'trip', 'tripdone', 'help'};
@@ -190,8 +206,37 @@ class AppState extends ChangeNotifier {
 
   void toggleOnline() {
     if (accountStatus != AccountStatus.active) return;
-    online = !online;
+
+    final prev = online;
+    final next = !online;
+    online = next;
     notifyListeners();
+
+    if (next) {
+      _maybeStartDeliveryRealtime();
+    } else {
+      _stopDeliveryRealtime();
+    }
+
+    // Best-effort: update online status on backend so it can dispatch assignments to us.
+    final token = accessToken;
+    final pid = partnerId;
+    if (token == null || pid == null || pid.isEmpty) return;
+
+    unawaited(() async {
+      try {
+        await DeliveryPartnersApi().toggleOnline(accessToken: token, partnerId: pid, isOnline: next);
+      } catch (_) {
+        // Revert local online state if backend rejects.
+        online = prev;
+        if (online) {
+          _maybeStartDeliveryRealtime();
+        } else {
+          _stopDeliveryRealtime();
+        }
+        notifyListeners();
+      }
+    }());
   }
 
   /// Demo trigger for "Simulate an order" — in production the request arrives
@@ -206,6 +251,21 @@ class AppState extends ChangeNotifier {
 
   void _startAlertCountdown() {
     _alertTimer?.cancel();
+
+    // If backend provided an accept deadline, drive the countdown from it.
+    final deadline = activeRequest?.acceptDeadlineAt;
+    if (deadline != null) {
+      final secs = deadline.difference(DateTime.now()).inSeconds;
+      alertCountdown = secs.clamp(0, 9999);
+    } else {
+      alertCountdown = alertCountdown.clamp(0, 9999);
+    }
+
+    if (alertCountdown <= 0) {
+      _dismissAlertLocal();
+      return;
+    }
+
     _alertTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!alertOpen) {
         t.cancel();
@@ -213,7 +273,8 @@ class AppState extends ChangeNotifier {
       }
       if (alertCountdown <= 1) {
         t.cancel();
-        rejectAlert(); // auto-decline once the response window elapses
+        // Backend will auto-cancel/reassign on expiry; locally dismiss the alert.
+        _dismissAlertLocal();
         return;
       }
       alertCountdown -= 1;
@@ -223,7 +284,37 @@ class AppState extends ChangeNotifier {
 
   void acceptAlert() {
     _alertTimer?.cancel();
+
+    final req = activeRequest;
+    final assignmentId = req?.assignmentId ?? '';
+    final token = accessToken;
+    final pid = partnerId;
+
     alertOpen = false;
+    notifyListeners();
+
+    unawaited(() async {
+      // If this is a demo request (assignmentId is empty), accept locally.
+      if (assignmentId.isEmpty || token == null || pid == null || pid.isEmpty) {
+        _acceptLocally();
+        return;
+      }
+
+      try {
+        await DeliveryAssignmentsApi().claim(accessToken: token, assignmentId: assignmentId, partnerId: pid);
+        _acceptLocally();
+      } catch (_) {
+        // If another rider claimed it first, re-open locally until the next websocket update.
+        if (req?.acceptDeadlineAt != null) {
+          alertOpen = true;
+          _startAlertCountdown();
+        }
+        notifyListeners();
+      }
+    }());
+  }
+
+  void _acceptLocally() {
     stage = DeliveryStage.toPickup;
     pickupOtp = '';
     dropOtp = '';
@@ -234,13 +325,138 @@ class AppState extends ChangeNotifier {
 
   void rejectAlert() {
     _alertTimer?.cancel();
+
+    final req = activeRequest;
+    final assignmentId = req?.assignmentId ?? '';
+    final token = accessToken;
+    final pid = partnerId;
+
     alertOpen = false;
     notifyListeners();
+
+    // Decline the assignment on backend (for real incoming orders).
+    if (assignmentId.isEmpty || token == null || pid == null || pid.isEmpty) return;
+
+    unawaited(() async {
+      try {
+        await DeliveryAssignmentsApi().reject(
+          accessToken: token,
+          assignmentId: assignmentId,
+          partnerId: pid,
+          reason: 'Rider rejected',
+        );
+      } catch (_) {
+        // Best-effort: keep local dismissal even if backend fails.
+      }
+    }());
+  }
+
+  void _dismissAlertLocal() {
+    _alertTimer?.cancel();
+    alertOpen = false;
+    notifyListeners();
+  }
+
+  void _handleWsNewAssignment(WsDeliveryAssignment ws) {
+    // Only show incoming offers on Home (Trip flow already blocks availability).
+    if (accountStatus != AccountStatus.active) return;
+    if (screen != 'home') return;
+
+    activeRequest = _mergeWsIntoDemoRequest(ws);
+    alertOpen = true;
+    // Reset local step state for the incoming flow.
+    stage = DeliveryStage.toPickup;
+    pickupOtp = '';
+    dropOtp = '';
+    codCollected = false;
+
+    _startAlertCountdown();
+    notifyListeners();
+  }
+
+  DeliveryRequest _mergeWsIntoDemoRequest(WsDeliveryAssignment ws) {
+    final base = demoRequest;
+    return DeliveryRequest(
+      assignmentId: ws.assignmentId,
+      orderId: ws.orderId,
+      restaurantName: base.restaurantName,
+      restaurantAddress: base.restaurantAddress,
+      customerName: base.customerName,
+      customerAddress: (ws.customerAddress != null && ws.customerAddress!.trim().isNotEmpty) ? ws.customerAddress!.trim() : base.customerAddress,
+      totalKm: ws.estimatedDistanceKm ?? base.totalKm,
+      totalMins: ws.estimatedDurationMins ?? base.totalMins,
+      payout: ws.deliveryFee.round(),
+      orderTotal: base.orderTotal,
+      paymentMethod: base.paymentMethod,
+      items: base.items,
+      acceptDeadlineAt: ws.acceptDeadlineAt,
+    );
+  }
+
+  void _handleWsAssignmentCancelled(String assignmentId) {
+    if (!alertOpen) return;
+    if ((activeRequest?.assignmentId ?? '') != assignmentId) return;
+    _dismissAlertLocal();
+  }
+
+  void _maybeStartDeliveryRealtime() {
+    final pid = partnerId;
+    if (pid == null || pid.isEmpty) return;
+    if (!online) return;
+    if (accountStatus != AccountStatus.active) return;
+    if (_deliverySocket != null && _deliverySocketPartnerId == pid) return;
+
+    _deliverySocket?.disconnect();
+    _deliverySocket = DeliverySocketService();
+    _deliverySocketPartnerId = pid;
+    _deliverySocket!.connect(
+      partnerId: pid,
+      onNewAssignment: _handleWsNewAssignment,
+      onAssignmentCancelled: _handleWsAssignmentCancelled,
+    );
+  }
+
+  void _stopDeliveryRealtime() {
+    _deliverySocket?.disconnect();
+    _deliverySocket = null;
+    _deliverySocketPartnerId = null;
   }
 
   // ---- live trip ----
 
   void nextStage() {
+    final req = activeRequest;
+    final assignmentId = req?.assignmentId ?? '';
+    final token = accessToken;
+
+    final prevStage = stage;
+
+    unawaited(() async {
+      // If this is a demo request, just advance locally.
+      if (assignmentId.isEmpty || token == null) {
+        _advanceStageLocally();
+        return;
+      }
+
+      final nextStatus = _apiStatusForNextTransition(prevStage);
+      if (nextStatus == null) return;
+
+      try {
+        await DeliveryAssignmentsApi().updateStatus(
+          accessToken: token,
+          assignmentId: assignmentId,
+          status: nextStatus,
+        );
+      } catch (_) {
+        // If backend rejects status transition, keep UI as-is.
+        return;
+      }
+
+      _advanceStageLocally();
+    }());
+  }
+
+  void _advanceStageLocally() {
     switch (stage) {
       case DeliveryStage.toPickup:
         stage = DeliveryStage.atPickup;
@@ -257,6 +473,20 @@ class AppState extends ChangeNotifier {
         return;
     }
     notifyListeners();
+  }
+
+  /// Map local [DeliveryStage] button-press to backend DeliveryStatus for the next stage.
+  String? _apiStatusForNextTransition(DeliveryStage s) {
+    switch (s) {
+      case DeliveryStage.toPickup:
+        return 'PICKED_UP';
+      case DeliveryStage.atPickup:
+        return 'ON_THE_WAY';
+      case DeliveryStage.toDrop:
+        return 'ARRIVED';
+      case DeliveryStage.atDrop:
+        return 'DELIVERED';
+    }
   }
 
   void setOtp(String digits) {

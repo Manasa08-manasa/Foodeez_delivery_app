@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
 
     <application
-        android:label="foodeez_delivery"
+        android:label="Foodeez Rider"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 

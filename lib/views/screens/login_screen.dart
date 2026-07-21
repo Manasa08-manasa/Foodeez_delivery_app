@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../controllers/app_controller.dart';
 import '../../core/theme.dart';
+import '../../core/responsive.dart';
 import '../../services/auth_service.dart';
 import 'otp_screen.dart';
 
@@ -35,15 +36,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await AuthService().sendLoginOtp(email: email);
       if (!mounted) return;
       Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => OtpVerificationScreen(email: email),
-        ),
+        MaterialPageRoute(builder: (_) => OtpVerificationScreen(email: email)),
       );
     } catch (e) {
       if (!mounted) return;
-      final message = e.toString().replaceFirst('Exception: ', '').replaceFirst('TimeoutException after', 'Request timed out after');
+      final message = e
+          .toString()
+          .replaceFirst('Exception: ', '')
+          .replaceFirst('TimeoutException after', 'Request timed out after');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message.isNotEmpty ? message : 'Unable to send OTP right now. Please try again.')),
+        SnackBar(
+          content: Text(
+            message.isNotEmpty
+                ? message
+                : 'Unable to send OTP right now. Please try again.',
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -58,7 +66,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(26),
+          padding: Responsive.screenPadding(context, horizontal: 26),
           child: Form(
             key: _formKey,
             child: Column(
@@ -93,10 +101,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                       RichText(
                         text: TextSpan(
-                          style: AppText.display(
-                            size: 28,
-                            letterSpacing: -0.6,
-                          ),
+                          style: AppText.display(size: 28, letterSpacing: -0.6),
                           children: const [
                             TextSpan(text: "Welcome "),
                             TextSpan(
@@ -152,63 +157,64 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           return null;
                         },
                       ),
+
+                      const SizedBox(height: 16),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                          ),
+                          onPressed: _isLoading ? null : _sendOtp,
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  "Send OTP",
+                                  style: AppText.body(
+                                    size: 16,
+                                    weight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      RichText(
+                        text: TextSpan(
+                          style: AppText.body(
+                            size: 13,
+                            color: AppColors.lightGreyText,
+                          ),
+                          children: [
+                            const TextSpan(text: "New delivery partner? "),
+                            TextSpan(
+                              text: "Sign Up",
+                              style: const TextStyle(
+                                color: AppColors.accent,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              recognizer: TapGestureRecognizer()
+                                ..onTap = () {
+                                  app.go('signup');
+                                },
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
-                ),
-
-                Column(
-                  children: [
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.accent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                        ),
-                        onPressed: _isLoading ? null : _sendOtp,
-                        child: _isLoading
-                            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white))
-                            : Text(
-                                "Send OTP",
-                                style: AppText.body(
-                                  size: 16,
-                                  weight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 15),
-
-                    RichText(
-                      text: TextSpan(
-                        style: AppText.body(
-                          size: 13,
-                          color: AppColors.lightGreyText,
-                        ),
-                        children: [
-                          const TextSpan(
-                            text: "New delivery partner? ",
-                          ),
-                          TextSpan(
-                            text: "Sign Up",
-                            style: const TextStyle(
-                              color: AppColors.accent,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            recognizer: TapGestureRecognizer()
-                              ..onTap = () {
-                                app.go('signup');
-                              },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),

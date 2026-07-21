@@ -10,6 +10,7 @@ const riderId = 'FZR-40271';
 /// request alert. Static demo data — a real app would receive this from the
 /// dispatch/order service over push/websocket.
 const DeliveryRequest demoRequest = DeliveryRequest(
+  assignmentId: '',
   orderId: 'FZ8241',
   restaurantName: 'Paradise Biryani',
   restaurantAddress: 'Banjara Hills, Road 12 · Outlet #402',

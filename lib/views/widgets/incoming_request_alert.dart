@@ -4,6 +4,7 @@ import '../../data/mock_data.dart';
 import '../../models/app_models.dart';
 import '../../controllers/app_controller.dart';
 import '../../core/theme.dart';
+import '../../core/responsive.dart';
 
 class IncomingRequestAlert extends ConsumerStatefulWidget {
   const IncomingRequestAlert({super.key});
@@ -33,7 +34,7 @@ class _IncomingRequestAlertState extends ConsumerState<IncomingRequestAlert> wit
         alignment: Alignment.bottomCenter,
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(20, 22, 20, 30),
+          padding: Responsive.screenPadding(context, horizontal: 20, vertical: 22).copyWith(bottom: 30),
           decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
           child: Column(
             mainAxisSize: MainAxisSize.min,

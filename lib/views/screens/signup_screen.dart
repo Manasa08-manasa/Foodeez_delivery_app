@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../controllers/app_controller.dart';
 import '../../core/theme.dart';
+import '../../core/responsive.dart';
 import '../../services/auth_service.dart';
 import '../widgets/common.dart';
 
@@ -300,7 +301,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       color: Colors.white,
       child: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 30),
+          padding: Responsive.screenPadding(context, horizontal: 20, vertical: 4).copyWith(bottom: 30),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

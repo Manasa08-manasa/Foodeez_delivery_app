@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/mock_data.dart';
 import '../../controllers/app_controller.dart';
 import '../../core/theme.dart';
+import '../../core/responsive.dart';
 import '../widgets/common.dart';
 
 class HelpScreen extends ConsumerWidget {
@@ -13,7 +14,7 @@ class HelpScreen extends ConsumerWidget {
     final app = ref.read(appControllerProvider);
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
+        padding: Responsive.screenPadding(context, horizontal: 20, vertical: 4).copyWith(bottom: 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

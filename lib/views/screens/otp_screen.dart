@@ -3,14 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../controllers/app_controller.dart';
 import '../../core/theme.dart';
+import '../../core/responsive.dart';
 import '../../services/auth_service.dart';
+import '../widgets/common.dart';
 
 class OtpVerificationScreen extends ConsumerStatefulWidget {
   final String email;
   const OtpVerificationScreen({super.key, required this.email});
 
   @override
-  ConsumerState<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
+  ConsumerState<OtpVerificationScreen> createState() =>
+      _OtpVerificationScreenState();
 }
 
 class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
@@ -18,6 +21,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _otpSent = false;
+  bool _verifyCompleted = false;
 
   @override
   void dispose() {
@@ -47,6 +51,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   }
 
   Future<void> _verifyOtp() async {
+    if (_verifyCompleted || _isLoading) return;
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
@@ -57,92 +62,142 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
         otp: otp,
       );
       if (!mounted) return;
-      ref.read(appControllerProvider).setAuthenticatedUser(
-        accessToken: authResponse.accessToken,
-        partnerId: authResponse.partner.id,
-        partnerName: authResponse.partner.name,
-        partnerEmail: authResponse.partner.email,
-        partnerStatus: authResponse.partner.status,
-        vehicleType: authResponse.partner.vehicleType,
-      );
+
+      _verifyCompleted = true;
+      ref
+          .read(appControllerProvider)
+          .setAuthenticatedUser(
+            accessToken: authResponse.accessToken,
+            partnerId: authResponse.partner.id,
+            partnerName: authResponse.partner.name,
+            partnerEmail: authResponse.partner.email,
+            partnerStatus: authResponse.partner.status,
+            vehicleType: authResponse.partner.vehicleType,
+          );
       ref.read(appControllerProvider).toHome();
+      Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
         );
+        setState(() => _isLoading = false);
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _goBackToLogin() {
+    if (_verifyCompleted || _isLoading) return;
+    Navigator.of(context).pop();
   }
 
   @override
   Widget build(BuildContext context) {
-    final app = ref.read(appControllerProvider);
-
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    return PopScope(
+      canPop: !_isLoading && !_verifyCompleted,
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.accent),
-          onPressed: app.back,
-        ),
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Verify OTP', style: AppText.display(size: 28, letterSpacing: -0.5)),
-                const SizedBox(height: 10),
-                Text('Enter the 6-digit code sent to ${widget.email}', style: AppText.body(size: 14, color: AppColors.bodyGrey)),
-                const SizedBox(height: 28),
-                TextFormField(
-                  controller: _otpCtrl,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  decoration: InputDecoration(
-                    hintText: 'Enter OTP',
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) return 'Please enter OTP';
-                    if (value.trim().length < 4) return 'OTP must be at least 4 digits';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _verifyOtp,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        body: SafeArea(
+          child: Padding(
+            padding: Responsive.screenPadding(context, horizontal: 24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        BackButtonChip(onTap: _goBackToLogin),
+                        const SizedBox(width: 12),
+                        Text('Verify OTP', style: AppText.display(size: 20)),
+                      ],
                     ),
-                    child: _isLoading
-                        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white))
-                        : Text('Verify', style: AppText.body(size: 16, weight: FontWeight.w700, color: Colors.white)),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Center(
-                  child: TextButton(
-                    onPressed: _isLoading ? null : _resendOtp,
-                    child: Text(_otpSent ? 'Resend OTP' : 'Resend OTP', style: AppText.body(size: 14, weight: FontWeight.w700, color: AppColors.accent)),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Enter the 6-digit code sent to ${widget.email}',
+                    style: AppText.body(size: 14, color: AppColors.bodyGrey),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 28),
+                  TextFormField(
+                    controller: _otpCtrl,
+                    enabled: !_verifyCompleted && !_isLoading,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    decoration: InputDecoration(
+                      hintText: 'Enter OTP',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty)
+                        return 'Please enter OTP';
+                      if (value.trim().length < 4)
+                        return 'OTP must be at least 4 digits';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: (_isLoading || _verifyCompleted)
+                          ? null
+                          : _verifyOtp,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              'Verify',
+                              style: AppText.body(
+                                size: 16,
+                                weight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: TextButton(
+                      onPressed: (_isLoading || _verifyCompleted)
+                          ? null
+                          : _resendOtp,
+                      child: Text(
+                        'Resend OTP',
+                        style: AppText.body(
+                          size: 14,
+                          weight: FontWeight.w700,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

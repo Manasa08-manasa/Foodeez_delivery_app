@@ -4,6 +4,7 @@ import '../../data/mock_data.dart';
 import '../../models/app_models.dart';
 import '../../controllers/app_controller.dart';
 import '../../core/theme.dart';
+import '../../core/responsive.dart';
 import '../../services/auth_service.dart';
 import '../widgets/common.dart';
 
@@ -15,7 +16,7 @@ class ProfileScreen extends ConsumerWidget {
     final app = ref.watch(appControllerProvider);
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 130),
+        padding: Responsive.screenPadding(context, horizontal: 20, vertical: 4).copyWith(bottom: Responsive.isTablet(context) ? 150 : 130),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

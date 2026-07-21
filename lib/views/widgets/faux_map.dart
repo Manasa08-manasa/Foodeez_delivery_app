@@ -140,7 +140,7 @@ class _MapPainter extends CustomPainter {
 
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height * 0.22),
-      Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x47140810), Colors.transparent]).createShader(Rect.fromLTWH(0, 0, size.width, size.height * 0.22)),
+      Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x470D2D41), Colors.transparent]).createShader(Rect.fromLTWH(0, 0, size.width, size.height * 0.22)),
     );
   }
 

@@ -5,6 +5,7 @@ import '../../data/mock_data.dart';
 import '../../models/app_models.dart';
 import '../../controllers/app_controller.dart';
 import '../../core/theme.dart';
+import '../../core/responsive.dart';
 import '../widgets/common.dart';
 import '../widgets/faux_map.dart';
 
@@ -141,7 +142,7 @@ class TripScreen extends ConsumerWidget {
         else
           Container(
             height: 130,
-            padding: const EdgeInsets.fromLTRB(20, 54, 20, 0),
+            padding: Responsive.screenPadding(context, horizontal: 20).copyWith(top: 54),
             decoration: const BoxDecoration(gradient: AppColors.heroGradient),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,7 +178,7 @@ class TripScreen extends ConsumerWidget {
             transform: Matrix4.translationValues(0, -24, 0),
             decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 26),
+              padding: Responsive.screenPadding(context, horizontal: 20, vertical: 8).copyWith(bottom: 26),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

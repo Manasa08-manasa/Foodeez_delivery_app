@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
+import '../../core/responsive.dart';
 
 /// Plum-tinted rounded-square back button used on pushed sub-screens
 /// (Ratings, Profile→Help). The live Trip screen uses its own back button
@@ -31,7 +32,7 @@ class ScreenHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+      padding: Responsive.screenPadding(context, horizontal: 20, vertical: 4).copyWith(bottom: 12),
       child: Row(
         children: [
           BackButtonChip(onTap: onBack),

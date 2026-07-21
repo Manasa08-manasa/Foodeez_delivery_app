@@ -1,11 +1,11 @@
 {
-    "name": "foodeez_delivery",
-    "short_name": "foodeez_delivery",
+    "name": "Foodeez Rider",
+    "short_name": "Foodeez Rider",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0D2D41",
+    "theme_color": "#0D2D41",
+    "description": "Foodeez delivery rider app — ride, deliver, earn.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

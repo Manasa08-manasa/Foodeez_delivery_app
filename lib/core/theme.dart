@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 
-/// Foodeez Rider brand palette — hex values sourced verbatim from the design prototype.
+/// Foodeez Rider brand palette.
 class AppColors {
   AppColors._();
 
-  static const accent = Color(0xFF6E2A4D);
-  static const accentLight = Color(0xFF8A3A66);
-  static const accentDeep = Color(0xFF4E1D37);
+  static const accent = Color(0xFF0D2D41);
+  static const accentLight = Color(0xFF1A4A6B);
+  static const accentDeep = Color(0xFF082030);
 
   static const gold = Color(0xFFC9A227);
   static const goldDeep = Color(0xFFB4692E);
+  static const goldLight = Color(0xFFE8C547);
 
   static const green = Color(0xFF1F8A3B);
   static const greenPaleBg = Color(0xFFE7F4EA);
@@ -36,8 +37,8 @@ class AppColors {
   static const dividerBorder = Color(0xFFE4DCE0);
   static const dividerBorder2 = Color(0xFFEFEAE6);
 
-  static const plumTint = Color(0xFFF6EEF3);
-  static const plumTintBorder = Color(0xFFE8D3E0);
+  static const plumTint = Color(0xFFEDF4F8);
+  static const plumTintBorder = Color(0xFFC5D9E8);
 
   static const goldTint = Color(0xFFFBF0DE);
   static const goldTintBorder2 = Color(0xFFEAD6A9);
@@ -45,6 +46,7 @@ class AppColors {
   static const otpBorderIdle = Color(0xFFE4DCE0);
 
   static const heroGradient = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accentLight, accent]);
+  static const goldTextGradient = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [goldLight, gold, goldDeep]);
   static const onlineHeroGradient = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFEDF7EF), Color(0xFFE3F1E7)]);
   static const incentiveGradient = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFFBF0DE), Color(0xFFF8E7C6)]);
   static const sosGradient = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFFBEEEE), Color(0xFFF7E0E0)]);
