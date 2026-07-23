@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  static const accent = Color(0xFF0D2D41);
-  static const accentLight = Color(0xFF1A4A6B);
-  static const accentDeep = Color(0xFF082030);
+  static const accent = Color(0xFF112D46);
+  static const accentLight = Color(0xFF1A446A);
+  static const accentDeep = Color(0xFF0A1E2F);
 
   static const gold = Color(0xFFC9A227);
   static const goldDeep = Color(0xFFB4692E);

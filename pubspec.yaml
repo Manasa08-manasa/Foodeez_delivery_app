@@ -58,15 +58,15 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: assets/images/delivery-partner-logo.png
+  image_path: assets/images/Rider_logo.png
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: assets/images/delivery-partner-logo.png
+  adaptive_icon_foreground: assets/images/Rider_logo.png
   adaptive_icon_foreground_inset: 18
   web:
     generate: true
-    image_path: assets/images/delivery-partner-logo.png
+    image_path: assets/images/Rider_logo.png
     background_color: "#FFFFFF"
-    theme_color: "#0D2D41"
+    theme_color: "#112D46"
 
 flutter_native_splash:
   color: "#0A1B2E"
@@ -91,6 +91,7 @@ flutter:
     - assets/images/delivery-partner-logo.png
     - assets/images/foodeez-mark.png
     - assets/images/foodeez-full.png
+    - assets/images/Rider_logo.png
 
   fonts:
     - family: Bricolage Grotesque

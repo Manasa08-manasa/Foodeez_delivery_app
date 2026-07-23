@@ -90,7 +90,7 @@ class _SplashScreenState extends State<SplashScreen>
     final taglineSize = Responsive.fontSize(context, 11.5);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A1B2E),
+      backgroundColor: AppColors.accentDeep,
       body: AnimatedBuilder(
         animation: _controller,
         builder: (context, _) {
@@ -104,9 +104,9 @@ class _SplashScreenState extends State<SplashScreen>
                     center: Alignment(0, -0.3),
                     radius: 1.2,
                     colors: [
-                      Color(0xFF0D2D41),
-                      Color(0xFF0A1B2E),
-                      Color(0xFF050E17),
+                      AppColors.accentLight,
+                      AppColors.accentDeep,
+                      Color(0xFF07131D),
                     ],
                   ),
                 ),

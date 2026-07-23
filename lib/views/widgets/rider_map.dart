@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../../core/theme.dart';
+
 class RiderMap extends StatefulWidget {
   final String? partnerId;
   final List<Map<String, dynamic>> activeRiders;
@@ -180,7 +182,7 @@ class _RiderMapState extends State<RiderMap> {
       return _activeRiderIcons[riderId]!;
     }
     final marker = await _createMarkerIcon(
-      const Color(0xFF10B981),
+      AppColors.accent,
       label: initials,
       subLabel: _shortNameForMarker(riderName),
     );
@@ -197,7 +199,7 @@ class _RiderMapState extends State<RiderMap> {
   }
 
   Future<void> _initMarkerIcons() async {
-    _currentPartnerIcon = await _createMarkerIcon(const Color(0xFF3B82F6), icon: Icons.person);
+    _currentPartnerIcon = await _createMarkerIcon(AppColors.accent, icon: Icons.person);
     if (mounted) {
       await _syncMarkers();
     }
