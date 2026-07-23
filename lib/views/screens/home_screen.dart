@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/app_models.dart';
@@ -51,6 +53,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (_loadingStats && _statsLoaded) return;
 
     final app = ref.read(appControllerProvider);
+    if (app.accessToken != null && app.accessToken!.isNotEmpty) {
+      unawaited(app.refreshActiveRiders());
+    }
     final token = app.accessToken;
     final partnerId = app.partnerId;
     if (token == null ||
@@ -684,6 +689,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _onlineHero() {
+    final app = ref.read(appControllerProvider);
     return SizedBox(
       height: 140,
       child: Container(
@@ -716,7 +722,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Finding orders near Banjara Hills...',
+                    app.activeRiders.isNotEmpty
+                        ? 'Tracking ${app.activeRiders.length} nearby rider${app.activeRiders.length == 1 ? '' : 's'} in real time'
+                        : 'Finding orders near you...',
                     style: AppText.body(size: 12, color: AppColors.midGrey2),
                   ),
                   const Spacer(),
@@ -978,6 +986,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
   Widget _buildMapPreview(BuildContext context) {
+    final app = ref.read(appControllerProvider);
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -1002,7 +1011,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           borderRadius: BorderRadius.circular(22),
           child: Stack(
             children: [
-              const RiderMap(),
+              RiderMap(
+                partnerId: app.partnerId,
+                activeRiders: app.activeRiders,
+                onLocationChanged: (latitude, longitude) {
+                  ref.read(appControllerProvider).updateLastKnownLocation(
+                    latitude: latitude,
+                    longitude: longitude,
+                  );
+                },
+              ),
               Positioned(
                 left: 16,
                 right: 16,
@@ -1046,6 +1064,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildFullScreenMapView(BuildContext context) {
+    final app = ref.read(appControllerProvider);
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: SafeArea(
@@ -1118,7 +1137,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   topLeft: Radius.circular(28),
                   topRight: Radius.circular(28),
                 ),
-                child: const RiderMap(),
+                child: RiderMap(
+                  partnerId: app.partnerId,
+                  activeRiders: app.activeRiders,
+                  onLocationChanged: (latitude, longitude) {
+                    ref.read(appControllerProvider).updateLastKnownLocation(
+                      latitude: latitude,
+                      longitude: longitude,
+                    );
+                  },
+                ),
               ),
             ),
           ],

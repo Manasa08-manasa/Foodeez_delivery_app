@@ -6,6 +6,7 @@ import '../models/app_models.dart';
 import '../services/delivery_assignments_api.dart';
 import '../services/delivery_partners_api.dart';
 import '../services/delivery_socket_service.dart';
+import '../services/delivery_tracking_api.dart';
 
 /// Mirrors the design prototype's `Component` state machine: a screen stack
 /// for push/pop flows, plus a "tab reset" mode for the 4 bottom-dock destinations.
@@ -114,6 +115,13 @@ class AppState extends ChangeNotifier {
 
   DeliverySocketService? _deliverySocket;
   String? _deliverySocketPartnerId;
+  Timer? _locationTimer;
+  Timer? _assignmentPollTimer;
+  DateTime? _lastLocationPushAt;
+  double? _lastLatitude;
+  double? _lastLongitude;
+  String? _lastLocationStatus;
+  List<Map<String, dynamic>> activeRiders = const [];
 
   String earnPeriod = 'today';
 
@@ -133,6 +141,8 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _alertTimer?.cancel();
+    _locationTimer?.cancel();
+    _assignmentPollTimer?.cancel();
     _deliverySocket?.disconnect();
     _deliverySocket = null;
     _deliverySocketPartnerId = null;
@@ -168,6 +178,8 @@ class AppState extends ChangeNotifier {
   void toHelp() => go('help');
 
   void logout() {
+    _locationTimer?.cancel();
+    _assignmentPollTimer?.cancel();
     _deliverySocket?.disconnect();
     _deliverySocket = null;
     _deliverySocketPartnerId = null;
@@ -194,6 +206,8 @@ class AppState extends ChangeNotifier {
 
     // If the user is already marked online, start listening immediately for new orders.
     _maybeStartDeliveryRealtime();
+    _startLocationTracking();
+    _startAssignmentPolling();
   }
 
   static const _hideTabScreens = {'login', 'signup', 'trip', 'tripdone', 'help'};
@@ -214,8 +228,12 @@ class AppState extends ChangeNotifier {
 
     if (next) {
       _maybeStartDeliveryRealtime();
+      _startLocationTracking();
+      _startAssignmentPolling();
     } else {
       _stopDeliveryRealtime();
+      _stopLocationTracking();
+      _stopAssignmentPolling();
     }
 
     // Best-effort: update online status on backend so it can dispatch assignments to us.
@@ -420,6 +438,217 @@ class AppState extends ChangeNotifier {
     _deliverySocket?.disconnect();
     _deliverySocket = null;
     _deliverySocketPartnerId = null;
+  }
+
+  Future<void> refreshActiveRiders() async {
+    final token = accessToken;
+    if (token == null || token.isEmpty) return;
+
+    try {
+      final riders = await DeliveryTrackingApi().activeRiders(accessToken: token);
+      activeRiders = riders;
+      notifyListeners();
+    } catch (_) {
+      activeRiders = const [];
+      notifyListeners();
+    }
+  }
+
+  Future<void> refreshIncomingAssignments() async {
+    final token = accessToken;
+    final pid = partnerId;
+    if (token == null || token.isEmpty || pid == null || pid.isEmpty) return;
+    if (!online || accountStatus != AccountStatus.active) return;
+
+    try {
+      final items = await DeliveryAssignmentsApi().byPartner(
+        accessToken: token,
+        partnerId: pid,
+        page: 1,
+        limit: 20,
+      );
+
+      final pending = <DeliveryRequest>[];
+      for (final item in items) {
+        final req = _mapAssignmentToDeliveryRequest(item);
+        if (req == null) continue;
+        final status = (item['status'] ?? '').toString().toUpperCase();
+        if (status.isEmpty || ['ASSIGNED', 'PENDING', 'NEW', 'WAITING_FOR_RIDER', 'READY_FOR_PICKUP'].contains(status)) {
+          pending.add(req);
+        }
+      }
+
+      if (pending.isEmpty) return;
+
+      final next = pending.first;
+      final sameAssignment = (activeRequest?.assignmentId ?? '') == next.assignmentId;
+      final inTripFlow = stack.contains('trip') || stack.contains('tripdone');
+      if (sameAssignment || inTripFlow) return;
+
+      activeRequest = next;
+      alertOpen = true;
+      stage = DeliveryStage.toPickup;
+      pickupOtp = '';
+      dropOtp = '';
+      codCollected = false;
+      _startAlertCountdown();
+      notifyListeners();
+    } catch (_) {
+      // Stay resilient if the backend assignment list is temporarily unavailable.
+    }
+  }
+
+  DeliveryRequest? _mapAssignmentToDeliveryRequest(Map<String, dynamic> item) {
+    final assignmentId = _readString(item, ['id', 'assignmentId', 'assignment_id']);
+    if (assignmentId == null || assignmentId.isEmpty) return null;
+
+    final base = demoRequest;
+    final orderId = _readString(item, ['orderId', 'order_id', 'orderNumber', 'order_number']) ?? '';
+    final restaurantName = _readString(item, ['restaurantName', 'restaurant_name', 'restaurant', 'restaurantName']) ?? base.restaurantName;
+    final restaurantAddress = _readString(item, ['restaurantAddress', 'restaurant_address', 'restaurantAddressLine', 'restaurant_address_line']) ?? base.restaurantAddress;
+    final customerName = _readString(item, ['customerName', 'customer_name', 'customer', 'name']) ?? base.customerName;
+    final customerAddress = _readString(item, ['customerAddress', 'customer_address', 'dropAddress', 'deliveryAddress', 'delivery_address']) ?? base.customerAddress;
+    final payout = _readInt(item, ['deliveryFee', 'delivery_fee', 'payout']) ?? base.payout;
+    final distance = _readDouble(item, ['estimatedDistanceKm', 'estimated_distance_km']) ?? base.totalKm;
+    final duration = _readInt(item, ['estimatedDurationMins', 'estimated_duration_mins']) ?? base.totalMins;
+
+    return DeliveryRequest(
+      assignmentId: assignmentId,
+      orderId: orderId,
+      restaurantName: restaurantName,
+      restaurantAddress: restaurantAddress,
+      customerName: customerName,
+      customerAddress: customerAddress,
+      totalKm: distance,
+      totalMins: duration,
+      payout: payout,
+      orderTotal: base.orderTotal,
+      paymentMethod: base.paymentMethod,
+      items: base.items,
+      acceptDeadlineAt: _readDate(item, ['acceptDeadlineAt', 'accept_deadline_at', 'expiresAt', 'expires_at']),
+    );
+  }
+
+  String? _readString(Map<String, dynamic> item, List<String> candidates) {
+    final found = _findValue(item, candidates);
+    if (found == null) return null;
+    final text = found.toString().trim();
+    return text.isEmpty ? null : text;
+  }
+
+  int? _readInt(Map<String, dynamic> item, List<String> candidates) {
+    final found = _findValue(item, candidates);
+    if (found == null) return null;
+    if (found is int) return found;
+    if (found is num) return found.toInt();
+    return int.tryParse(found.toString());
+  }
+
+  double? _readDouble(Map<String, dynamic> item, List<String> candidates) {
+    final found = _findValue(item, candidates);
+    if (found == null) return null;
+    if (found is num) return found.toDouble();
+    return double.tryParse(found.toString());
+  }
+
+  DateTime? _readDate(Map<String, dynamic> item, List<String> candidates) {
+    final found = _findValue(item, candidates);
+    if (found == null) return null;
+    if (found is DateTime) return found;
+    final text = found.toString();
+    return text.isEmpty ? null : DateTime.tryParse(text);
+  }
+
+  dynamic _findValue(dynamic node, List<String> candidates) {
+    if (node is Map) {
+      final map = Map<String, dynamic>.from(node);
+      for (final candidate in candidates) {
+        if (map.containsKey(candidate)) return map[candidate];
+      }
+      for (final value in map.values) {
+        final found = _findValue(value, candidates);
+        if (found != null) return found;
+      }
+    } else if (node is List) {
+      for (final item in node) {
+        final found = _findValue(item, candidates);
+        if (found != null) return found;
+      }
+    }
+    return null;
+  }
+
+  void _startLocationTracking() {
+    _locationTimer?.cancel();
+    final token = accessToken;
+    final pid = partnerId;
+    if (token == null || pid == null || pid.isEmpty) return;
+    if (!online) return;
+    if (accountStatus != AccountStatus.active) return;
+
+    _locationTimer = Timer.periodic(const Duration(seconds: 12), (_) async {
+      await _pushLocationPulse();
+    });
+
+    unawaited(_pushLocationPulse());
+  }
+
+  void _stopLocationTracking() {
+    _locationTimer?.cancel();
+    _locationTimer = null;
+  }
+
+  void _startAssignmentPolling() {
+    _assignmentPollTimer?.cancel();
+    if (!online || accountStatus != AccountStatus.active) return;
+
+    _assignmentPollTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      unawaited(refreshIncomingAssignments());
+    });
+
+    unawaited(refreshIncomingAssignments());
+  }
+
+  void _stopAssignmentPolling() {
+    _assignmentPollTimer?.cancel();
+    _assignmentPollTimer = null;
+  }
+
+  Future<void> _pushLocationPulse() async {
+    final token = accessToken;
+    final pid = partnerId;
+    if (token == null || pid == null || pid.isEmpty) return;
+    if (!online) return;
+    if (accountStatus != AccountStatus.active) return;
+
+    final now = DateTime.now();
+    if (_lastLocationPushAt != null && now.difference(_lastLocationPushAt!).inSeconds < 10) {
+      return;
+    }
+
+    // Use a conservative fallback location for now so the backend receives a valid payload.
+    const fallbackLatitude = 17.4126;
+    const fallbackLongitude = 78.4482;
+
+    try {
+      await DeliveryTrackingApi().shareLocation(
+        accessToken: token,
+        partnerId: pid,
+        latitude: _lastLatitude ?? fallbackLatitude,
+        longitude: _lastLongitude ?? fallbackLongitude,
+        status: _lastLocationStatus ?? (online ? 'ONLINE' : 'OFFLINE'),
+      );
+      _lastLocationPushAt = now;
+    } catch (_) {
+      // Keep the UI resilient if the tracking endpoint is unavailable.
+    }
+  }
+
+  void updateLastKnownLocation({required double latitude, required double longitude, String? status}) {
+    _lastLatitude = latitude;
+    _lastLongitude = longitude;
+    _lastLocationStatus = status;
+    notifyListeners();
   }
 
   // ---- live trip ----
