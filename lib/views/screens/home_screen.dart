@@ -31,6 +31,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   bool _loadingStats = true;
   bool _statsLoaded = false;
   String? _statsError;
+  bool _showMap = false;
+  bool _fullScreenMap = false;
 
   @override
   void initState() {
@@ -260,6 +262,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget build(BuildContext context) {
     final app = ref.watch(appControllerProvider);
 
+    if (_fullScreenMap) {
+      return _buildFullScreenMapView(context);
+    }
+
     ref.listen(appControllerProvider.select((a) => a.accessToken), (
       previous,
       next,
@@ -303,6 +309,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ],
                   ),
                 ),
+                GestureDetector(
+                  onTap: app.toggleOnline,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: app.online ? const Color(0xFFE8F7ED) : const Color(0xFFFDE8E8),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: app.online ? AppColors.green : AppColors.red,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: app.online ? AppColors.green : AppColors.red,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          app.online ? 'ONLINE' : 'OFFLINE',
+                          style: AppText.body(
+                            size: 12,
+                            weight: FontWeight.w700,
+                            color: app.online ? AppColors.green : AppColors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
                 GestureDetector(
                   onTap: app.toProfile,
                   child: Container(
@@ -352,6 +398,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
               ),
             ),
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Live map',
+                  style: AppText.body(
+                    size: 12,
+                    weight: FontWeight.w700,
+                    color: AppColors.bodyGrey,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _showMap = !_showMap;
+                      _fullScreenMap = _showMap;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.accent.withOpacity(0.16),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _showMap ? Icons.visibility_off : Icons.map,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _showMap ? 'Hide map' : 'Show map',
+                          style: AppText.body(
+                            size: 12.5,
+                            weight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (_showMap) ...[
+              const SizedBox(height: 16),
+              _buildMapPreview(context),
+            ],
             const SizedBox(height: 18),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -578,112 +685,80 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Widget _onlineHero() {
     return SizedBox(
-      height: 260,
-
-      child: Stack(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-
-            child: SizedBox.expand(child: const RiderMap()),
-          ),
-
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-
-              children: [
-                Container(
-                  width: 56,
-
-                  height: 56,
-
-                  decoration: BoxDecoration(
-                    color: Colors.green,
-
-                    shape: BoxShape.circle,
-
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.green.withOpacity(.4),
-
-                        blurRadius: 20,
-                      ),
-                    ],
+      height: 140,
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: AppColors.onlineHeroGradient,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: AppColors.goldTintBorder2),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: AppColors.greenPaleBg,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(Icons.location_on, color: AppColors.green, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "You're online",
+                    style: AppText.display(size: 18, color: AppColors.accentDeep),
                   ),
-
-                  child: const Center(
-                    child: Icon(Icons.location_on, color: Colors.white),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Finding orders near Banjara Hills...',
+                    style: AppText.body(size: 12, color: AppColors.midGrey2),
                   ),
-                ),
-
-                const SizedBox(height: 15),
-
-                Text("You're online", style: AppText.display(size: 18)),
-
-                const SizedBox(height: 5),
-
-                Text(
-                  "Finding orders near Banjara Hills...",
-
-                  style: AppText.body(size: 12, color: Colors.black87),
-                ),
-
-                const SizedBox(height: 15),
-
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-
-                    vertical: 10,
-                  ),
-
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-
-                  child: GestureDetector(
+                  const Spacer(),
+                  GestureDetector(
                     onTap: () {
                       ref.read(appControllerProvider).openAlert();
                     },
-
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-
-                      children: [
-                        const Icon(Icons.circle, color: Colors.green, size: 10),
-
-                        const SizedBox(width: 8),
-
-                        const Text("LIVE"),
-
-                        const SizedBox(width: 12),
-
-                        Container(width: 1, height: 15, color: Colors.grey),
-
-                        const SizedBox(width: 12),
-
-                        Text(
-                          "Simulate an order →",
-
-                          style: AppText.body(
-                            size: 12,
-
-                            weight: FontWeight.bold,
-
-                            color: AppColors.accent,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.circle, color: Colors.green, size: 10),
+                          const SizedBox(width: 8),
+                          const Text("LIVE"),
+                          const SizedBox(width: 12),
+                          Container(width: 1, height: 15, color: Colors.grey),
+                          const SizedBox(width: 12),
+                          Text(
+                            "Simulate an order →",
+                            style: AppText.body(
+                              size: 12,
+                              weight: FontWeight.bold,
+                              color: AppColors.accent,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -902,4 +977,152 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ),
     );
   }
-}
+  Widget _buildMapPreview(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _fullScreenMap = true;
+        });
+      },
+      child: Container(
+        height: 260,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: AppColors.cardBorder),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: Stack(
+            children: [
+              const RiderMap(),
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 16,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.52),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Live location preview',
+                        style: AppText.body(
+                          size: 12,
+                          color: Colors.white,
+                          weight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'Tap to expand',
+                        style: AppText.body(
+                          size: 11.5,
+                          color: Colors.white.withOpacity(0.8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFullScreenMapView(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 16,
+              ),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _fullScreenMap = false;
+                      });
+                    },
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.cardBorder),
+                      ),
+                      child: const Icon(Icons.arrow_back, color: AppColors.accent),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      'Live map',
+                      style: AppText.display(size: 20, color: AppColors.accent),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _fullScreenMap = false;
+                        _showMap = false;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        'Hide map',
+                        style: AppText.body(
+                          size: 12.5,
+                          weight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(28),
+                  topRight: Radius.circular(28),
+                ),
+                child: const RiderMap(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }}

@@ -69,9 +69,12 @@ flutter_launcher_icons:
     theme_color: "#0D2D41"
 
 flutter_native_splash:
-  color: "#0D2D41"
+  color: "#0A1B2E"
+  image: assets/images/foodeez-full.png
   android_12:
-    color: "#0D2D41"
+    color: "#0A1B2E"
+    image: assets/images/foodeez-mark.png
+    icon_background_color: "#0A1B2E"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
