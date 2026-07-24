@@ -72,20 +72,18 @@ const List<RiderReview> riderReviews = [
 /// already-established demo account (all pre-verified); a fresh signup
 /// starts every one of these at [DocumentStatus.unverified] instead — see
 /// `AppState.startNewApplication`.
+/// Document ids match `GET /delivery-partners/:id` fields
+/// (`license`, `aadhar`, `pan`, `bank`, `address_proof`).
 const List<VerifiableDocument> verifiableDocuments = [
-  VerifiableDocument(id: 'dl', icon: Icons.badge_outlined, label: 'Driving licence', numberHint: 'DL number', provider: VerificationProvider.sandbox),
-  VerifiableDocument(id: 'rc', icon: Icons.description_outlined, label: 'Vehicle RC', numberHint: 'RC number', provider: VerificationProvider.apisetu),
-  VerifiableDocument(id: 'insurance', icon: Icons.shield_outlined, label: 'Insurance', numberHint: 'Policy number', provider: VerificationProvider.verifico),
+  VerifiableDocument(id: 'license', icon: Icons.badge_outlined, label: 'Driving licence', numberHint: 'DL number', provider: VerificationProvider.sandbox),
+  VerifiableDocument(id: 'aadhar', icon: Icons.badge_outlined, label: 'Aadhaar', numberHint: 'Aadhaar number', provider: VerificationProvider.apisetu),
+  VerifiableDocument(id: 'pan', icon: Icons.description_outlined, label: 'PAN card', numberHint: 'PAN number', provider: VerificationProvider.verifico),
   VerifiableDocument(id: 'bank', icon: Icons.account_balance_outlined, label: 'Bank account (for payouts)', numberHint: 'Account number + IFSC', provider: VerificationProvider.razorpay),
+  VerifiableDocument(id: 'address_proof', icon: Icons.home_outlined, label: 'Address proof', numberHint: 'Address proof type', provider: VerificationProvider.apisetu, requiresNumber: false),
 ];
 
-/// Seed document numbers for the established demo account (login flow).
-const Map<String, String> seedDocumentNumbers = {
-  'dl': 'TS0920230012345',
-  'rc': 'TS09EA1234',
-  'insurance': 'POL-88213409',
-  'bank': '50100234567890 · HDFC0000123',
-};
+/// Empty seeds — Profile fills these from `GET /delivery-partners/:id`.
+const Map<String, String> seedDocumentNumbers = {};
 
 const List<RiderPref> riderPrefDefs = [
   RiderPref(key: 'longTrips', icon: Icons.route_outlined, label: 'Accept long trips (>6 km)'),

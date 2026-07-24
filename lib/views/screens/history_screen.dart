@@ -5,6 +5,7 @@ import '../../controllers/app_controller.dart';
 import '../../core/theme.dart';
 import '../../core/responsive.dart';
 import '../../core/utils.dart';
+import '../widgets/common.dart';
 
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
@@ -20,11 +21,19 @@ class HistoryScreen extends ConsumerWidget {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Text('Trip history', style: AppText.display(size: 20)),
-                  Padding(padding: const EdgeInsets.only(top: 2), child: Text('$todayTrips trips today · ${moneyFmt(todayEarn)} earned', style: AppText.body(size: 12.5, color: AppColors.bodyGrey))),
+                  BackButtonChip(onTap: () => ref.read(appControllerProvider).toHome()),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Trip history', style: AppText.display(size: 20)),
+                        Padding(padding: const EdgeInsets.only(top: 2), child: Text('$todayTrips trips today · ${moneyFmt(todayEarn)} earned', style: AppText.body(size: 12.5, color: AppColors.bodyGrey))),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

@@ -10,6 +10,28 @@ class DeliveryPartnersApi {
 
   DeliveryPartnersApi({http.Client? client}) : _client = client ?? http.Client();
 
+  Future<Map<String, dynamic>> getPartner({
+    required String accessToken,
+    required String partnerId,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/delivery-partners/$partnerId');
+    final res = await _client.get(
+      uri,
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+    );
+
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw Exception(_parseError(res.body));
+    }
+
+    final decoded = jsonDecode(res.body);
+    if (decoded is Map<String, dynamic>) return decoded;
+    return const {};
+  }
+
   Future<Map<String, dynamic>> getEarnings({
     required String accessToken,
     required String partnerId,

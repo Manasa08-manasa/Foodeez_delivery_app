@@ -22,7 +22,16 @@ class EarningsScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text('Earnings', style: AppText.display(size: 20))),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  BackButtonChip(onTap: () => app.toHome()),
+                  const SizedBox(width: 12),
+                  Text('Earnings', style: AppText.display(size: 20)),
+                ],
+              ),
+            ),
             SegmentedPills(labels: _labels, selectedIndex: _periods.indexOf(app.earnPeriod), onSelect: (i) => app.setEarnPeriod(_periods[i])),
             const SizedBox(height: 16),
             Container(

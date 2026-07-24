@@ -61,7 +61,7 @@ flutter_launcher_icons:
   image_path: assets/images/Rider_logo.png
   adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: assets/images/Rider_logo.png
-  adaptive_icon_foreground_inset: 18
+  adaptive_icon_foreground_inset: 17
   web:
     generate: true
     image_path: assets/images/Rider_logo.png
@@ -92,6 +92,7 @@ flutter:
     - assets/images/foodeez-mark.png
     - assets/images/foodeez-full.png
     - assets/images/Rider_logo.png
+    - assets/images/rider-bike-marker.png
 
   fonts:
     - family: Bricolage Grotesque

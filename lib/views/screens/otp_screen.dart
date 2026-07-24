@@ -109,113 +109,126 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
             padding: Responsive.screenPadding(context, horizontal: 24),
             child: Form(
               key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _CircleBackButton(onTap: _goBackToLogin),
-                      _SecureBadge(),
-                    ],
-                  ),
-                  const SizedBox(height: 28),
-                  Text(
-                    'Verify OTP',
-                    style: AppText.display(size: 34, weight: FontWeight.w800, color: AppColors.accent, letterSpacing: -0.8),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    'Enter the 6-digit code sent to',
-                    textAlign: TextAlign.center,
-                    style: AppText.body(size: 14.5, color: AppColors.bodyGrey),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    widget.email,
-                    textAlign: TextAlign.center,
-                    style: AppText.body(size: 15, weight: FontWeight.w800, color: AppColors.ink),
-                  ),
-                  const SizedBox(height: 28),
-                  _OtpInputBox(
-                    controller: _otpCtrl,
-                    focusNode: _otpFocus,
-                    enabled: !_verifyCompleted && !_isLoading,
-                    onTap: () => _otpFocus.requestFocus(),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: _otpLength / 6,
-                            minHeight: 3,
-                            backgroundColor: AppColors.dividerBorder,
-                            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
-                          ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.only(bottom: bottomInset > 0 ? 16 : 8),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: constraints.maxHeight - bottomInset),
+                      child: IntrinsicHeight(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _CircleBackButton(onTap: _goBackToLogin),
+                                _SecureBadge(),
+                              ],
+                            ),
+                            const SizedBox(height: 28),
+                            Text(
+                              'Verify OTP',
+                              style: AppText.display(size: 34, weight: FontWeight.w800, color: AppColors.accent, letterSpacing: -0.8),
+                            ),
+                            const SizedBox(height: 18),
+                            Text(
+                              'Enter the 6-digit code sent to',
+                              textAlign: TextAlign.center,
+                              style: AppText.body(size: 14.5, color: AppColors.bodyGrey),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              widget.email,
+                              textAlign: TextAlign.center,
+                              style: AppText.body(size: 15, weight: FontWeight.w800, color: AppColors.ink),
+                            ),
+                            const SizedBox(height: 28),
+                            _OtpInputBox(
+                              controller: _otpCtrl,
+                              focusNode: _otpFocus,
+                              enabled: !_verifyCompleted && !_isLoading,
+                              onTap: () => _otpFocus.requestFocus(),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: LinearProgressIndicator(
+                                      value: _otpLength / 6,
+                                      minHeight: 3,
+                                      backgroundColor: AppColors.dividerBorder,
+                                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  '$_otpLength/6',
+                                  style: AppText.body(size: 12, weight: FontWeight.w600, color: AppColors.bodyGrey),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              height: 56,
+                              child: ElevatedButton(
+                                onPressed: _canVerify ? _verifyOtp : null,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _canVerify ? AppColors.accent : const Color(0xFF9BA8B5),
+                                  disabledBackgroundColor: const Color(0xFF9BA8B5),
+                                  foregroundColor: Colors.white,
+                                  disabledForegroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                                ),
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+                                      )
+                                    : Text('Verify', style: AppText.body(size: 16, weight: FontWeight.w700, color: Colors.white)),
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            Center(
+                              child: TextButton.icon(
+                                onPressed: (_isLoading || _verifyCompleted) ? null : _resendOtp,
+                                icon: const Icon(Icons.refresh_rounded, size: 18, color: AppColors.accent),
+                                label: Text(
+                                  'Resend OTP',
+                                  style: AppText.body(size: 14.5, weight: FontWeight.w800, color: AppColors.accent),
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 24, bottom: 8),
+                              child: RichText(
+                                textAlign: TextAlign.center,
+                                text: TextSpan(
+                                  style: AppText.body(size: 12.5, color: AppColors.lightGreyText, height: 1.55),
+                                  children: [
+                                    const TextSpan(text: "Didn't get the email? Check your spam folder or make sure "),
+                                    TextSpan(
+                                      text: widget.email,
+                                      style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.midGrey),
+                                    ),
+                                    const TextSpan(text: ' is correct.'),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Text(
-                        '$_otpLength/6',
-                        style: AppText.body(size: 12, weight: FontWeight.w600, color: AppColors.bodyGrey),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: _canVerify ? _verifyOtp : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _canVerify ? AppColors.accent : const Color(0xFF9BA8B5),
-                        disabledBackgroundColor: const Color(0xFF9BA8B5),
-                        foregroundColor: Colors.white,
-                        disabledForegroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
-                            )
-                          : Text('Verify', style: AppText.body(size: 16, weight: FontWeight.w700, color: Colors.white)),
                     ),
-                  ),
-                  const SizedBox(height: 18),
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: (_isLoading || _verifyCompleted) ? null : _resendOtp,
-                      icon: const Icon(Icons.refresh_rounded, size: 18, color: AppColors.accent),
-                      label: Text(
-                        'Resend OTP',
-                        style: AppText.body(size: 14.5, weight: FontWeight.w800, color: AppColors.accent),
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: RichText(
-                      textAlign: TextAlign.center,
-                      text: TextSpan(
-                        style: AppText.body(size: 12.5, color: AppColors.lightGreyText, height: 1.55),
-                        children: [
-                          const TextSpan(text: "Didn't get the email? Check your spam folder or make sure "),
-                          TextSpan(
-                            text: widget.email,
-                            style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.midGrey),
-                          ),
-                          const TextSpan(text: ' is correct.'),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
           ),

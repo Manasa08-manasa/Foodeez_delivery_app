@@ -21,6 +21,14 @@ class AppState extends ChangeNotifier {
   String? partnerEmail;
   String? partnerStatus;
   String? vehicleType;
+  String? vehicleNumber;
+  String? partnerPhone;
+  String? partnerCity;
+  double? partnerRating;
+  int? totalDeliveries;
+  int? totalRatings;
+  bool partnerProfileLoading = false;
+  String? partnerProfileError;
 
   /// Display helpers used by Home/Profile so they show the real, logged-in
   /// partner's data once available, and fall back to the bundled demo
@@ -41,15 +49,14 @@ class AppState extends ChangeNotifier {
 
   // ---- account activation / documents ----
 
-  /// The established demo persona (logs straight into Home) already has a
-  /// fully-verified account. A fresh signup starts at [pendingReview].
+  /// Demo/unauthenticated navigation stays active; real login overwrites from API.
   AccountStatus accountStatus = AccountStatus.active;
 
   final Map<String, String> documentNumbers = {...seedDocumentNumbers};
   final Map<String, DocumentStatus> documentStatus = {
-    for (final d in verifiableDocuments) d.id: DocumentStatus.verified,
+    for (final d in verifiableDocuments) d.id: DocumentStatus.unverified,
   };
-  final Map<String, bool> documentUploaded = {for (final d in verifiableDocuments) d.id: true};
+  final Map<String, bool> documentUploaded = {for (final d in verifiableDocuments) d.id: false};
 
   void setDocumentNumber(String id, String value) {
     documentNumbers[id] = value;
@@ -117,6 +124,7 @@ class AppState extends ChangeNotifier {
   String? _deliverySocketPartnerId;
   Timer? _locationTimer;
   Timer? _assignmentPollTimer;
+  Timer? _activeRidersPollTimer;
   DateTime? _lastLocationPushAt;
   double? _lastLatitude;
   double? _lastLongitude;
@@ -143,6 +151,7 @@ class AppState extends ChangeNotifier {
     _alertTimer?.cancel();
     _locationTimer?.cancel();
     _assignmentPollTimer?.cancel();
+    _activeRidersPollTimer?.cancel();
     _deliverySocket?.disconnect();
     _deliverySocket = null;
     _deliverySocketPartnerId = null;
@@ -180,6 +189,8 @@ class AppState extends ChangeNotifier {
   void logout() {
     _locationTimer?.cancel();
     _assignmentPollTimer?.cancel();
+    _activeRidersPollTimer?.cancel();
+    _activeRidersPollTimer = null;
     _deliverySocket?.disconnect();
     _deliverySocket = null;
     _deliverySocketPartnerId = null;
@@ -190,28 +201,172 @@ class AppState extends ChangeNotifier {
     partnerEmail = null;
     partnerStatus = null;
     vehicleType = null;
+    vehicleNumber = null;
+    partnerPhone = null;
+    partnerCity = null;
+    partnerRating = null;
+    totalDeliveries = null;
+    totalRatings = null;
+    partnerProfileLoading = false;
+    partnerProfileError = null;
+    documentNumbers
+      ..clear()
+      ..addAll(seedDocumentNumbers);
+    for (final d in verifiableDocuments) {
+      documentStatus[d.id] = DocumentStatus.unverified;
+      documentUploaded[d.id] = false;
+    }
+    accountStatus = AccountStatus.active;
     stack = ['login'];
     notifyListeners();
   }
 
-  void setAuthenticatedUser({required String accessToken, required String partnerId, required String partnerName, required String partnerEmail, required String partnerStatus, required String vehicleType}) {
+  void setAuthenticatedUser({
+    required String accessToken,
+    required String partnerId,
+    required String partnerName,
+    required String partnerEmail,
+    required String partnerStatus,
+    required String vehicleType,
+  }) {
     this.accessToken = accessToken;
     this.partnerId = partnerId;
     this.partnerName = partnerName;
     this.partnerEmail = partnerEmail;
     this.partnerStatus = partnerStatus;
     this.vehicleType = vehicleType;
-    accountStatus = AccountStatus.active;
+    accountStatus = _accountStatusFromPartner(partnerStatus);
     notifyListeners();
 
     // If the user is already marked online, start listening immediately for new orders.
     _maybeStartDeliveryRealtime();
     _startLocationTracking();
     _startAssignmentPolling();
+    _startActiveRidersPolling();
+    unawaited(loadPartnerProfile());
+  }
+
+  AccountStatus _accountStatusFromPartner(String? status) {
+    switch ((status ?? '').toUpperCase()) {
+      case 'ACTIVE':
+      case 'VERIFIED':
+        return AccountStatus.active;
+      case 'BLOCKED':
+      case 'INACTIVE':
+        return AccountStatus.rejected;
+      default:
+        return AccountStatus.pendingReview;
+    }
+  }
+
+  DocumentStatus _docStatusFromApi(String? status, {required bool hasUpload}) {
+    switch ((status ?? '').toLowerCase()) {
+      case 'approved':
+      case 'verified':
+        return DocumentStatus.verified;
+      case 'rejected':
+        return DocumentStatus.rejected;
+      case 'pending':
+      case 'uploaded':
+      case 'submitted':
+        return DocumentStatus.pending;
+      default:
+        return hasUpload ? DocumentStatus.pending : DocumentStatus.unverified;
+    }
+  }
+
+  void applyPartnerProfile(Map<String, dynamic> json) {
+    partnerName = json['name']?.toString() ?? partnerName;
+    partnerEmail = json['email']?.toString() ?? partnerEmail;
+    partnerPhone = json['phone']?.toString() ?? partnerPhone;
+    partnerCity = json['city']?.toString() ?? partnerCity;
+    partnerStatus = json['status']?.toString() ?? partnerStatus;
+    vehicleType = json['vehicleType']?.toString() ?? vehicleType;
+    vehicleNumber = json['vehicleNumber']?.toString() ?? vehicleNumber;
+    partnerRating = _asDouble(json['rating']);
+    totalDeliveries = _asInt(json['totalDeliveries']);
+    totalRatings = _asInt(json['totalRatings']);
+    accountStatus = _accountStatusFromPartner(partnerStatus);
+
+    final licenseUrl = json['licenseDocumentFrontUrl']?.toString();
+    final aadharUrl = json['aadharDocumentUrl']?.toString();
+    final panUrl = json['panDocumentUrl']?.toString();
+    final bankUrl = json['bankDocumentFrontUrl']?.toString();
+    final addressUrl = json['addressProofFrontUrl']?.toString();
+
+    final bankParts = <String>[
+      if ((json['bankAccountNumber']?.toString() ?? '').trim().isNotEmpty) json['bankAccountNumber'].toString().trim(),
+      if ((json['bankIfscCode']?.toString() ?? '').trim().isNotEmpty) json['bankIfscCode'].toString().trim(),
+    ];
+
+    documentNumbers
+      ..['license'] = json['licenseNumber']?.toString() ?? ''
+      ..['aadhar'] = json['aadharNumber']?.toString() ?? ''
+      ..['pan'] = json['panNumber']?.toString() ?? ''
+      ..['bank'] = bankParts.join(' · ')
+      ..['address_proof'] = json['addressProofType']?.toString() ?? '';
+
+    documentUploaded
+      ..['license'] = licenseUrl != null && licenseUrl.trim().isNotEmpty
+      ..['aadhar'] = aadharUrl != null && aadharUrl.trim().isNotEmpty
+      ..['pan'] = panUrl != null && panUrl.trim().isNotEmpty
+      ..['bank'] = bankUrl != null && bankUrl.trim().isNotEmpty
+      ..['address_proof'] = addressUrl != null && addressUrl.trim().isNotEmpty;
+
+    documentStatus
+      ..['license'] = _docStatusFromApi(json['licenseDocumentStatus']?.toString(), hasUpload: documentUploaded['license'] == true)
+      ..['aadhar'] = _docStatusFromApi(json['aadharDocumentStatus']?.toString(), hasUpload: documentUploaded['aadhar'] == true)
+      ..['pan'] = _docStatusFromApi(json['panDocumentStatus']?.toString(), hasUpload: documentUploaded['pan'] == true)
+      ..['bank'] = _docStatusFromApi(json['bankDocumentStatus']?.toString(), hasUpload: documentUploaded['bank'] == true)
+      ..['address_proof'] = _docStatusFromApi(json['addressProofStatus']?.toString(), hasUpload: documentUploaded['address_proof'] == true);
+
+    partnerProfileError = null;
+    notifyListeners();
+  }
+
+  Future<void> loadPartnerProfile() async {
+    final token = accessToken;
+    final id = partnerId;
+    if (token == null || token.isEmpty || id == null || id.isEmpty) return;
+
+    partnerProfileLoading = true;
+    partnerProfileError = null;
+    notifyListeners();
+
+    try {
+      final json = await DeliveryPartnersApi().getPartner(accessToken: token, partnerId: id);
+      applyPartnerProfile(json);
+    } catch (e) {
+      partnerProfileError = e.toString().replaceFirst('Exception: ', '');
+    } finally {
+      partnerProfileLoading = false;
+      notifyListeners();
+    }
+  }
+
+  double? _asDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
+  }
+
+  int? _asInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
   }
 
   static const _hideTabScreens = {'login', 'signup', 'trip', 'tripdone', 'help'};
-  bool get showTabBar => !_hideTabScreens.contains(screen) && accountStatus == AccountStatus.active;
+  bool hideDockNav = false;
+  bool get showTabBar =>
+      !hideDockNav && !_hideTabScreens.contains(screen) && accountStatus == AccountStatus.active;
+
+  void setHideDockNav(bool hide) {
+    if (hideDockNav == hide) return;
+    hideDockNav = hide;
+    notifyListeners();
+  }
 
   static const _activeTabFor = {'home': 'home', 'history': 'history', 'earnings': 'earnings', 'profile': 'profile', 'ratings': 'profile'};
   String get activeTab => _activeTabFor[screen] ?? '';
@@ -230,10 +385,12 @@ class AppState extends ChangeNotifier {
       _maybeStartDeliveryRealtime();
       _startLocationTracking();
       _startAssignmentPolling();
+      _startActiveRidersPolling();
     } else {
       _stopDeliveryRealtime();
       _stopLocationTracking();
       _stopAssignmentPolling();
+      _stopActiveRidersPolling();
     }
 
     // Best-effort: update online status on backend so it can dispatch assignments to us.
@@ -446,9 +603,11 @@ class AppState extends ChangeNotifier {
 
     try {
       final riders = await DeliveryTrackingApi().activeRiders(accessToken: token);
+      if (accessToken == null) return;
       activeRiders = riders;
       notifyListeners();
     } catch (_) {
+      if (accessToken == null) return;
       activeRiders = const [];
       notifyListeners();
     }
@@ -614,6 +773,22 @@ class AppState extends ChangeNotifier {
     _assignmentPollTimer = null;
   }
 
+  void _startActiveRidersPolling() {
+    _activeRidersPollTimer?.cancel();
+    if (!online || accountStatus != AccountStatus.active) return;
+
+    _activeRidersPollTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+      unawaited(refreshActiveRiders());
+    });
+
+    unawaited(refreshActiveRiders());
+  }
+
+  void _stopActiveRidersPolling() {
+    _activeRidersPollTimer?.cancel();
+    _activeRidersPollTimer = null;
+  }
+
   Future<void> _pushLocationPulse() async {
     final token = accessToken;
     final pid = partnerId;
@@ -675,7 +850,11 @@ class AppState extends ChangeNotifier {
           accessToken: token,
           assignmentId: assignmentId,
           status: nextStatus,
+          partnerLatitude: _lastLatitude,
+          partnerLongitude: _lastLongitude,
         );
+        // Keep tracking feed fresh around each stage transition.
+        unawaited(_pushLocationPulse());
       } catch (_) {
         // If backend rejects status transition, keep UI as-is.
         return;

@@ -39,6 +39,20 @@ class Responsive {
     if (isTablet(context)) return width.clamp(0, maxContentWidth);
     return width;
   }
+
+  /// Map / hero height that shrinks on short phones and grows on tablets.
+  static double mapHeight(BuildContext context, {double phone = 320, double tablet = 380}) {
+    final h = sizeOf(context).height;
+    final base = isTablet(context) ? tablet : phone;
+    // Cap map so the bottom sheet always has room on short screens.
+    final maxMap = h * (isTablet(context) ? 0.48 : 0.42);
+    final minMap = isTablet(context) ? 280.0 : 220.0;
+    return base.clamp(minMap, maxMap);
+  }
+
+  static double arrivedHeaderHeight(BuildContext context) {
+    return isTablet(context) ? 140.0 : (sizeOf(context).height < 700 ? 112.0 : 130.0);
+  }
 }
 
 /// Centers content on tablets so the phone layout does not stretch edge-to-edge.

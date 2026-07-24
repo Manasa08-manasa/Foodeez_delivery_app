@@ -43,8 +43,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadDeliveryStats());
   }
 
+  void _setFullScreenMap(bool open) {
+    if (_fullScreenMap == open) return;
+    setState(() => _fullScreenMap = open);
+    ref.read(appControllerProvider).setHideDockNav(open);
+  }
+
   @override
   void dispose() {
+    // Ensure dock returns if user leaves while map is open.
+    ref.read(appControllerProvider).setHideDockNav(false);
     _radar.dispose();
     super.dispose();
   }
@@ -322,7 +330,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: app.online ? const Color(0xFFE8F7ED) : const Color(0xFFFDE8E8),
+                      color: app.online
+                          ? const Color(0xFFE8F7ED)
+                          : const Color(0xFFFDE8E8),
                       borderRadius: BorderRadius.circular(22),
                       border: Border.all(
                         color: app.online ? AppColors.green : AppColors.red,
@@ -404,67 +414,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
             ),
             const SizedBox(height: 14),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Live map',
-                  style: AppText.body(
-                    size: 12,
-                    weight: FontWeight.w700,
-                    color: AppColors.bodyGrey,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _showMap = !_showMap;
-                      _fullScreenMap = _showMap;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.accent.withOpacity(0.16),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _showMap ? Icons.visibility_off : Icons.map,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _showMap ? 'Hide map' : 'Show map',
-                          style: AppText.body(
-                            size: 12.5,
-                            weight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (_showMap) ...[
-              const SizedBox(height: 16),
-              _buildMapPreview(context),
-            ],
-            const SizedBox(height: 18),
+            // Row(
+            //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            //   children: [
+            //     Text(
+            //       'Live map',
+            //       style: AppText.body(
+            //         size: 12,
+            //         weight: FontWeight.w700,
+            //         color: AppColors.bodyGrey,
+            //       ),
+            //     ),
+            //     GestureDetector(
+            //       onTap: () {
+            //         setState(() {
+            //           _showMap = !_showMap;
+            //           _fullScreenMap = _showMap;
+            //         });
+            //       },
+            //       child: Container(
+            //         padding: const EdgeInsets.symmetric(
+            //           horizontal: 14,
+            //           vertical: 10,
+            //         ),
+            //         decoration: BoxDecoration(
+            //           color: AppColors.accent,
+            //           borderRadius: BorderRadius.circular(16),
+            //           boxShadow: [
+            //             BoxShadow(
+            //               color: AppColors.accent.withOpacity(0.16),
+            //               blurRadius: 12,
+            //               offset: const Offset(0, 4),
+            //             ),
+            //           ],
+            //         ),
+            //         child: Row(
+            //           children: [
+            //             Icon(
+            //               _showMap ? Icons.visibility_off : Icons.map,
+            //               size: 16,
+            //               color: Colors.white,
+            //             ),
+            //             const SizedBox(width: 8),
+            //             Text(
+            //               _showMap ? 'Hide map' : 'Show map',
+            //               style: AppText.body(
+            //                 size: 12.5,
+            //                 weight: FontWeight.w700,
+            //                 color: Colors.white,
+            //               ),
+            //             ),
+            //           ],
+            //         ),
+            //       ),
+            //     ),
+            //   ],
+            // ),
+            // if (_showMap) ...[
+            //   const SizedBox(height: 16),
+            //   _buildMapPreview(context),
+            // ],
+            // const SizedBox(height: 18),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -689,84 +699,113 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _onlineHero() {
-    final app = ref.read(appControllerProvider);
-    return SizedBox(
-      height: 140,
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          gradient: AppColors.onlineHeroGradient,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: AppColors.goldTintBorder2),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: AppColors.greenPaleBg,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Icon(Icons.location_on, color: AppColors.green, size: 28),
+    final app = ref.watch(appControllerProvider);
+    final riderCount = app.activeRiders.length;
+    final trackingLabel = riderCount > 0
+        ? 'Tracking $riderCount nearby rider${riderCount == 1 ? '' : 's'} in real time'
+        : 'Finding orders near you...';
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: AppColors.onlineHeroGradient,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.goldTintBorder2),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: AppColors.greenPaleBg,
+              borderRadius: BorderRadius.circular(16),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "You're online",
-                    style: AppText.display(size: 18, color: AppColors.accentDeep),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    app.activeRiders.isNotEmpty
-                        ? 'Tracking ${app.activeRiders.length} nearby rider${app.activeRiders.length == 1 ? '' : 's'} in real time'
-                        : 'Finding orders near you...',
-                    style: AppText.body(size: 12, color: AppColors.midGrey2),
-                  ),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () {
-                      ref.read(appControllerProvider).openAlert();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.circle, color: Colors.green, size: 10),
-                          const SizedBox(width: 8),
-                          const Text("LIVE"),
-                          const SizedBox(width: 12),
-                          Container(width: 1, height: 15, color: Colors.grey),
-                          const SizedBox(width: 12),
-                          Text(
-                            "Simulate an order →",
+            child: const Icon(
+              Icons.location_on,
+              color: AppColors.green,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "You're online",
+                  style: AppText.display(size: 18, color: AppColors.accentDeep),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  trackingLabel,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.body(size: 12, color: AppColors.midGrey2),
+                ),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: () async {
+                    await ref.read(appControllerProvider).refreshActiveRiders();
+                    if (!mounted) return;
+                    setState(() {
+                      _showMap = true;
+                    });
+                    _setFullScreenMap(true);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.circle, color: Colors.green, size: 10),
+                        const SizedBox(width: 8),
+                        Text(
+                          'LIVE',
+                          style: AppText.body(
+                            size: 12,
+                            weight: FontWeight.w800,
+                            color: AppColors.green,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          width: 1,
+                          height: 15,
+                          color: Colors.grey.shade300,
+                        ),
+                        const SizedBox(width: 12),
+                        Flexible(
+                          child: Text(
+                            riderCount > 0
+                                ? 'View $riderCount nearby →'
+                                : 'Refresh nearby riders →',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: AppText.body(
                               size: 12,
                               weight: FontWeight.bold,
                               color: AppColors.accent,
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -985,16 +1024,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ),
     );
   }
+
   Widget _buildMapPreview(BuildContext context) {
     final app = ref.read(appControllerProvider);
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _fullScreenMap = true;
-        });
+        _setFullScreenMap(true);
       },
       child: Container(
-        height: 260,
+        height: Responsive.mapHeight(context, phone: 240, tablet: 300),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(22),
@@ -1015,10 +1053,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 partnerId: app.partnerId,
                 activeRiders: app.activeRiders,
                 onLocationChanged: (latitude, longitude) {
-                  ref.read(appControllerProvider).updateLastKnownLocation(
-                    latitude: latitude,
-                    longitude: longitude,
-                  );
+                  ref
+                      .read(appControllerProvider)
+                      .updateLastKnownLocation(
+                        latitude: latitude,
+                        longitude: longitude,
+                      );
                 },
               ),
               Positioned(
@@ -1072,17 +1112,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 16,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Row(
                 children: [
                   GestureDetector(
                     onTap: () {
-                      setState(() {
-                        _fullScreenMap = false;
-                      });
+                      _setFullScreenMap(false);
                     },
                     child: Container(
                       width: 44,
@@ -1092,7 +1127,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: AppColors.cardBorder),
                       ),
-                      child: const Icon(Icons.arrow_back, color: AppColors.accent),
+                      child: const Icon(
+                        Icons.arrow_back,
+                        color: AppColors.accent,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -1105,9 +1143,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   GestureDetector(
                     onTap: () {
                       setState(() {
-                        _fullScreenMap = false;
                         _showMap = false;
                       });
+                      _setFullScreenMap(false);
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -1141,10 +1179,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   partnerId: app.partnerId,
                   activeRiders: app.activeRiders,
                   onLocationChanged: (latitude, longitude) {
-                    ref.read(appControllerProvider).updateLastKnownLocation(
-                      latitude: latitude,
-                      longitude: longitude,
-                    );
+                    ref
+                        .read(appControllerProvider)
+                        .updateLastKnownLocation(
+                          latitude: latitude,
+                          longitude: longitude,
+                        );
                   },
                 ),
               ),
@@ -1153,4 +1193,5 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
       ),
     );
-  }}
+  }
+}

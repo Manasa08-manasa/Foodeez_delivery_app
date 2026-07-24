@@ -95,12 +95,12 @@ class TripScreen extends ConsumerWidget {
       children: [
         if (info.enroute)
           SizedBox(
-            height: 378,
+            height: Responsive.mapHeight(context),
             child: Stack(
               children: [
                 Positioned.fill(child: FauxMap(destinationIcon: info.icon)),
                 Positioned(
-                  top: 58,
+                  top: MediaQuery.paddingOf(context).top + 10,
                   left: 18,
                   child: GestureDetector(
                     onTap: app.back,
@@ -108,9 +108,9 @@ class TripScreen extends ConsumerWidget {
                   ),
                 ),
                 Positioned(
-                  top: 60,
-                  left: 0,
-                  right: 0,
+                  top: MediaQuery.paddingOf(context).top + 12,
+                  left: 64,
+                  right: 64,
                   child: Center(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
@@ -122,7 +122,7 @@ class TripScreen extends ConsumerWidget {
                           const SizedBox(width: 10),
                           Container(width: 1, height: 15, color: Colors.white.withValues(alpha: 0.25)),
                           const SizedBox(width: 10),
-                          Text(info.navDist, style: AppText.body(size: 12.5, weight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.85))),
+                          Flexible(child: Text(info.navDist, overflow: TextOverflow.ellipsis, style: AppText.body(size: 12.5, weight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.85)))),
                         ],
                       ),
                     ),
@@ -141,8 +141,8 @@ class TripScreen extends ConsumerWidget {
           )
         else
           Container(
-            height: 130,
-            padding: Responsive.screenPadding(context, horizontal: 20).copyWith(top: 54),
+            height: Responsive.arrivedHeaderHeight(context),
+            padding: Responsive.screenPadding(context, horizontal: 20).copyWith(top: MediaQuery.paddingOf(context).top + 12),
             decoration: const BoxDecoration(gradient: AppColors.heroGradient),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,7 +165,7 @@ class TripScreen extends ConsumerWidget {
                           Text('Arrived', style: AppText.body(size: 10.5, weight: FontWeight.w800, color: Colors.white)),
                         ]),
                       ),
-                      Padding(padding: const EdgeInsets.only(top: 6), child: Text(info.arrivedTitle, style: AppText.display(size: 18, color: Colors.white))),
+                      Padding(padding: const EdgeInsets.only(top: 6), child: Text(info.arrivedTitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.display(size: 18, color: Colors.white))),
                     ],
                   ),
                 ),
@@ -185,10 +185,16 @@ class TripScreen extends ConsumerWidget {
                   Center(child: Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 14), decoration: BoxDecoration(color: AppColors.dividerBorder, borderRadius: BorderRadius.circular(3)))),
                   Row(
                     children: [
-                      Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: AppColors.plumTint, borderRadius: BorderRadius.circular(8)), child: Text(info.badge, style: AppText.body(size: 10.5, weight: FontWeight.w800, color: AppColors.accent, letterSpacing: 0.6))),
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(color: AppColors.plumTint, borderRadius: BorderRadius.circular(8)),
+                          child: Text(info.badge, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.body(size: 10.5, weight: FontWeight.w800, color: AppColors.accent, letterSpacing: 0.6)),
+                        ),
+                      ),
                       const SizedBox(width: 8),
-                      Text('Order #${req.orderId}', style: AppText.body(size: 12, weight: FontWeight.w700, color: AppColors.bodyGrey)),
-                      const Spacer(),
+                      Flexible(child: Text('Order #${req.orderId}', maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.body(size: 12, weight: FontWeight.w700, color: AppColors.bodyGrey))),
+                      const SizedBox(width: 8),
                       Text('Earn +₹${req.payout}', style: AppText.body(size: 12, weight: FontWeight.w800, color: AppColors.green)),
                     ],
                   ),
@@ -207,8 +213,8 @@ class TripScreen extends ConsumerWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(info.title, style: AppText.display(size: 16)),
-                                  Padding(padding: const EdgeInsets.only(top: 2), child: Text(info.sub, style: AppText.body(size: 12.5, color: AppColors.bodyGrey))),
+                                  Text(info.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.display(size: 16)),
+                                  Padding(padding: const EdgeInsets.only(top: 2), child: Text(info.sub, maxLines: 3, overflow: TextOverflow.ellipsis, style: AppText.body(size: 12.5, color: AppColors.bodyGrey))),
                                 ],
                               ),
                             ),
