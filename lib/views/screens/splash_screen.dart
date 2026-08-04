@@ -1,14 +1,13 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 import '../../core/responsive.dart';
 import '../../core/theme.dart';
 
-/// Standalone Rider Route Draw Splash Screen.
-/// Features deep navy gradient background, grid lines, animated route drawing,
-/// travelling rider marker dot, pin drop at destination with pulse rings,
-/// gold gradient RIDER typography, tagline, and progress bar.
+/// Final Rider splash — matches brand mockup:
+/// navy grid, gold route draw, pin drop with Rider logo, RIDER + tagline.
 class SplashScreen extends StatefulWidget {
   final VoidCallback onComplete;
 
@@ -20,214 +19,163 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
+  static const _durationMs = 3200;
+  static const _logoAsset = 'assets/images/Rider_logo.png';
+  static const _bg = Color(0xFF0A0E14);
 
-  late final Animation<double> _fadeIn;
-  late final Animation<double> _pathProgress;
+  late final AnimationController _c;
+  late final Animation<double> _pathDraw;
   late final Animation<double> _pinDrop;
-  late final Animation<double> _pulseProgress;
-  late final Animation<double> _textSlide;
-  late final Animation<double> _barProgress;
+  late final Animation<double> _textIn;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    _c = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3200),
+      duration: const Duration(milliseconds: _durationMs),
     );
 
-    _fadeIn = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.0, 0.20, curve: Curves.easeOut),
+    _pathDraw = CurvedAnimation(
+      parent: _c,
+      curve: const Interval(0.0, 0.48, curve: Curves.easeInOutCubic),
     );
-
-    _pathProgress = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.08, 0.58, curve: Curves.easeInOutCubic),
-    );
-
     _pinDrop = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.50, 0.75, curve: Curves.elasticOut),
+      parent: _c,
+      curve: const Interval(0.42, 0.70, curve: Curves.elasticOut),
+    );
+    _textIn = CurvedAnimation(
+      parent: _c,
+      curve: const Interval(0.58, 0.86, curve: Curves.easeOutCubic),
     );
 
-    _pulseProgress = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.60, 0.90, curve: Curves.easeOut),
-    );
-
-    _textSlide = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.65, 0.92, curve: Curves.easeOutCubic),
-    );
-
-    _barProgress = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.10, 0.90, curve: Curves.easeInOut),
-    );
-
-    _controller.forward();
-
-    Future<void>.delayed(const Duration(milliseconds: 3800), () {
+    _c.forward().whenComplete(() {
       if (mounted) widget.onComplete();
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        precacheImage(const AssetImage(_logoAsset), context);
+      }
     });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _c.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final graphicWidth = Responsive.isTablet(context) ? 320.0 : math.min(size.width * 0.8, 280.0);
-    final graphicHeight = graphicWidth * 1.35;
-
+    final screen = MediaQuery.sizeOf(context);
     final titleSize = Responsive.fontSize(context, 48);
-    final taglineSize = Responsive.fontSize(context, 11.5);
+    final taglineSize = Responsive.fontSize(context, 11);
+
+    final gW = math.min(
+      screen.width * 0.82,
+      Responsive.isTablet(context) ? 340.0 : 300.0,
+    );
+    final gH = gW * 1.22;
 
     return Scaffold(
-      backgroundColor: AppColors.accentDeep,
+      backgroundColor: _bg,
       body: AnimatedBuilder(
-        animation: _controller,
+        animation: _c,
         builder: (context, _) {
           return Stack(
             fit: StackFit.expand,
             children: [
-              // Navy Gradient Background
-              Container(
-                decoration: const BoxDecoration(
+              const DecoratedBox(
+                decoration: BoxDecoration(
                   gradient: RadialGradient(
-                    center: Alignment(0, -0.3),
-                    radius: 1.2,
+                    center: Alignment(0, -0.2),
+                    radius: 1.3,
                     colors: [
-                      AppColors.accentLight,
-                      AppColors.accentDeep,
-                      Color(0xFF07131D),
+                      Color(0xFF111722),
+                      _bg,
+                      Color(0xFF05070C),
                     ],
+                    stops: [0.0, 0.55, 1.0],
                   ),
                 ),
               ),
-
-              // Grid Painter
-              CustomPaint(
+              const CustomPaint(
+                painter: _GridPainter(),
                 size: Size.infinite,
-                painter: _BackgroundGridPainter(),
               ),
-
-              // Content Column
-              FadeTransition(
-                opacity: _fadeIn,
-                child: SafeArea(
-                  child: Column(
-                    children: [
-                      const Spacer(flex: 2),
-
-                      // Route Animation Graphic
-                      SizedBox(
-                        width: graphicWidth,
-                        height: graphicHeight,
-                        child: CustomPaint(
-                          painter: _RouteDrawPainter(
-                            progress: _pathProgress.value,
-                            pinScale: _pinDrop.value,
-                            pulseProgress: _pulseProgress.value,
+              SafeArea(
+                child: Column(
+                  children: [
+                    const Spacer(flex: 3),
+                    SizedBox(
+                      width: gW,
+                      height: gH,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          CustomPaint(
+                            size: Size(gW, gH),
+                            painter: _RoutePainter(
+                              progress: _pathDraw.value,
+                              pinLanded: _pinDrop.value > 0.3,
+                            ),
                           ),
-                          child: Stack(
-                            children: [
-                              // Destination Pin Overlay
-                              if (_pathProgress.value > 0.4)
-                                _PinOverlay(
-                                  progress: _pathProgress.value,
-                                  pinDrop: _pinDrop.value,
-                                  graphicSize: Size(graphicWidth, graphicHeight),
-                                ),
-                            ],
+                          _PinWidget(
+                            progress: _pathDraw.value,
+                            drop: _pinDrop.value,
+                            size: Size(gW, gH),
                           ),
-                        ),
+                        ],
                       ),
-
-                      const Spacer(flex: 1),
-
-                      // Typography: RIDER & Tagline
-                      Transform.translate(
-                        offset: Offset(0, (1 - _textSlide.value) * 20),
-                        child: Opacity(
-                          opacity: _textSlide.value,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ShaderMask(
-                                blendMode: BlendMode.srcIn,
-                                shaderCallback: (bounds) => const LinearGradient(
-                                  colors: [
-                                    Color(0xFFF0D48A),
-                                    Color(0xFFE8C767),
-                                    Color(0xFFB8862F),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ).createShader(bounds),
-                                child: Text(
-                                  'RIDER',
-                                  style: AppText.display(
-                                    size: titleSize,
-                                    weight: FontWeight.w900,
-                                    color: Colors.white,
-                                    letterSpacing: 4.0,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'RIDE  ·  DELIVER  ·  EARN',
-                                style: AppText.body(
-                                  size: taglineSize,
-                                  weight: FontWeight.w600,
-                                  color: Colors.white.withOpacity(0.8),
-                                  letterSpacing: 3.2,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 36),
-
-                      // Gold Progress Bar
-                      Container(
-                        width: 120,
-                        height: 3,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(3),
-                          color: Colors.white.withOpacity(0.12),
-                        ),
-                        clipBehavior: Clip.hardEdge,
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: FractionallySizedBox(
-                            widthFactor: _barProgress.value.clamp(0.0, 1.0),
-                            child: Container(
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Color(0xFFF0D48A),
-                                    Color(0xFFB8862F),
-                                  ],
+                    ),
+                    const Spacer(flex: 2),
+                    Transform.translate(
+                      offset: Offset(0, (1 - _textIn.value) * 18),
+                      child: Opacity(
+                        opacity: _textIn.value,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ShaderMask(
+                              blendMode: BlendMode.srcIn,
+                              shaderCallback: (b) => const LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Color(0xFFF6E4A8),
+                                  Color(0xFFE2C46A),
+                                  Color(0xFFC49A2C),
+                                  Color(0xFF9A6E1A),
+                                ],
+                                stops: [0.0, 0.35, 0.7, 1.0],
+                              ).createShader(b),
+                              child: Text(
+                                'RIDER',
+                                style: AppText.display(
+                                  size: titleSize,
+                                  weight: FontWeight.w900,
+                                  color: Colors.white,
+                                  letterSpacing: 6,
                                 ),
                               ),
                             ),
-                          ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'RIDE  ·  DELIVER  ·  EARN',
+                              style: AppText.body(
+                                size: taglineSize,
+                                weight: FontWeight.w500,
+                                color: Colors.white.withValues(alpha: 0.92),
+                                letterSpacing: 3.6,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-
-                      SizedBox(height: Responsive.isTablet(context) ? 48 : 36),
-                    ],
-                  ),
+                    ),
+                    SizedBox(height: Responsive.isTablet(context) ? 64 : 52),
+                  ],
                 ),
               ),
             ],
@@ -238,20 +186,53 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-/// Draws background grid lines matching standalone HTML
-class _BackgroundGridPainter extends CustomPainter {
+// Route geometry (normalized to graphic bounds)
+// Start: lower-left · End tip: upper-center under pin
+const _sx = 0.16;
+const _sy = 0.90;
+const _ex = 0.50;
+const _ey = 0.22;
+
+Path _buildRoute(Size size) {
+  final w = size.width;
+  final h = size.height;
+  return Path()
+    ..moveTo(w * _sx, h * _sy)
+    ..cubicTo(
+      w * 0.38,
+      h * 0.82,
+      w * 0.82,
+      h * 0.74,
+      w * 0.68,
+      h * 0.52,
+    )
+    ..cubicTo(
+      w * 0.56,
+      h * 0.34,
+      w * 0.42,
+      h * 0.28,
+      w * _ex,
+      h * _ey,
+    );
+}
+
+/// Faint 3×4 map grid.
+class _GridPainter extends CustomPainter {
+  const _GridPainter();
+
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(0.04)
-      ..strokeWidth = 1.0;
+    final p = Paint()
+      ..color = const Color(0xFF2C3648).withValues(alpha: 0.38)
+      ..strokeWidth = 0.7;
 
-    const spacing = 50.0;
-    for (double x = 0; x <= size.width; x += spacing) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    final col = size.width / 3;
+    final row = size.height / 4;
+    for (var i = 1; i < 3; i++) {
+      canvas.drawLine(Offset(col * i, 0), Offset(col * i, size.height), p);
     }
-    for (double y = 0; y <= size.height; y += spacing) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    for (var i = 1; i < 4; i++) {
+      canvas.drawLine(Offset(0, row * i), Offset(size.width, row * i), p);
     }
   }
 
@@ -259,226 +240,208 @@ class _BackgroundGridPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// Custom painter for the route path, glowing stroke, start point, travelling dot, and pulse rings
-class _RouteDrawPainter extends CustomPainter {
+/// Draws the gold route + start dot + soft ground ring under pin.
+class _RoutePainter extends CustomPainter {
   final double progress;
-  final double pinScale;
-  final double pulseProgress;
+  final bool pinLanded;
 
-  _RouteDrawPainter({
-    required this.progress,
-    required this.pinScale,
-    required this.pulseProgress,
-  });
-
-  Path _getRoutePath(Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    // Bezier curve matching standalone HTML: M60 428 C 116 400, 190 394, 150 338 C 124 300, 132 294, 139 280
-    // Normalized to canvas bounds (w, h)
-    return Path()
-      ..moveTo(w * 0.22, h * 0.85)
-      ..cubicTo(
-        w * 0.45,
-        h * 0.78,
-        w * 0.72,
-        h * 0.76,
-        w * 0.55,
-        h * 0.58,
-      )
-      ..cubicTo(
-        w * 0.42,
-        h * 0.44,
-        w * 0.48,
-        h * 0.42,
-        w * 0.50,
-        h * 0.35,
-      );
-  }
+  _RoutePainter({required this.progress, required this.pinLanded});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = _getRoutePath(size);
+    final path = _buildRoute(size);
     final metrics = path.computeMetrics().toList();
     if (metrics.isEmpty) return;
+    final m = metrics.first;
+    final len = m.length;
 
-    final metric = metrics.first;
-    final totalLength = metric.length;
-
-    // 1. Base trace path (faint gold stroke)
-    final baseTracePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6.0
-      ..strokeCap = StrokeCap.round
-      ..color = const Color(0xFFE8C767).withOpacity(0.16);
-    canvas.drawPath(path, baseTracePaint);
-
-    // 2. Start circle
-    final startTangent = metric.getTangentForOffset(0);
-    if (startTangent != null) {
-      canvas.drawCircle(
-        startTangent.position,
-        6.0,
-        Paint()..color = const Color(0xFFF0D48A),
-      );
-    }
-
-    // 3. Active animated route line
-    if (progress > 0) {
-      final activeLength = totalLength * progress;
-      final activePath = metric.extractPath(0, activeLength);
-
-      // Glow under path
-      final glowPaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 12.0
-        ..strokeCap = StrokeCap.round
-        ..color = const Color(0xFFF0D48A).withOpacity(0.25)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
-      canvas.drawPath(activePath, glowPaint);
-
-      // Main gold gradient stroke
-      final strokePaint = Paint()
+    // Ghost route
+    canvas.drawPath(
+      path,
+      Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 4.5
         ..strokeCap = StrokeCap.round
-        ..shader = ui.Gradient.linear(
-          Offset.zero,
-          Offset(size.width, size.height),
-          [
-            const Color(0xFFF0D48A),
-            const Color(0xFFE8C767),
-            const Color(0xFFB8862F),
-          ],
-        );
-      canvas.drawPath(activePath, strokePaint);
+        ..color = const Color(0xFFE8C767).withValues(alpha: 0.10),
+    );
 
-      // 4. Travelling rider dot
-      if (progress < 0.98) {
-        final currentTangent = metric.getTangentForOffset(activeLength);
-        if (currentTangent != null) {
-          final pos = currentTangent.position;
+    // Start terminal
+    final start = m.getTangentForOffset(0);
+    if (start != null) {
+      canvas.drawCircle(
+        start.position,
+        5.5,
+        Paint()..color = const Color(0xFFE8C767),
+      );
+    }
 
-          // Outer glow circle
-          canvas.drawCircle(
-            pos,
-            12.0,
-            Paint()
-              ..color = const Color(0xFFF0D48A).withOpacity(0.35)
-              ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
-          );
+    if (progress > 0) {
+      final drawn = m.extractPath(0, len * progress.clamp(0.0, 1.0));
 
-          // Rider dot
+      // Soft under-glow
+      canvas.drawPath(
+        drawn,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 9
+          ..strokeCap = StrokeCap.round
+          ..color = const Color(0xFFE8C767).withValues(alpha: 0.18)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+      );
+
+      // Main gold stroke
+      canvas.drawPath(
+        drawn,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 4.0
+          ..strokeCap = StrokeCap.round
+          ..shader = ui.Gradient.linear(
+            Offset(size.width * _sx, size.height * _sy),
+            Offset(size.width * _ex, size.height * _ey),
+            const [
+              Color(0xFFF3D98A),
+              Color(0xFFE2C46A),
+              Color(0xFFC9A227),
+            ],
+          ),
+      );
+
+      // Travelling tip while drawing (disappears when complete)
+      if (progress < 0.985) {
+        final tip = m.getTangentForOffset(len * progress);
+        if (tip != null) {
           canvas.drawCircle(
-            pos,
-            6.5,
-            Paint()..color = const Color(0xFFF0D48A),
-          );
-          canvas.drawCircle(
-            pos,
-            3.0,
-            Paint()..color = Colors.white,
+            tip.position,
+            4.5,
+            Paint()..color = const Color(0xFFF3D98A),
           );
         }
       }
     }
 
-    // 5. Pulse rings anchored at destination pin base when pin drops
-    if (pinScale > 0.2) {
-      final endTangent = metric.getTangentForOffset(totalLength);
-      if (endTangent != null) {
-        final center = endTangent.position;
-
-        for (int i = 0; i < 2; i++) {
-          double pulse = (pulseProgress + (i * 0.4)) % 1.0;
-          double radius = 10.0 + (pulse * 30.0);
-          double opacity = (1.0 - pulse).clamp(0.0, 1.0);
-
-          final pulsePaint = Paint()
+    // Soft ground ring under pin tip (matches brand screenshot)
+    if (pinLanded) {
+      final end = m.getTangentForOffset(len);
+      if (end != null) {
+        final c = end.position.translate(0, 3);
+        // Soft fill
+        canvas.drawCircle(
+          c,
+          14,
+          Paint()
+            ..color = Colors.black.withValues(alpha: 0.28)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+        );
+        // Thin ring (matching reference under pin tip)
+        canvas.drawCircle(
+          c,
+          11,
+          Paint()
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 2.0
-            ..color = const Color(0xFFF0D48A).withOpacity(opacity * 0.7);
-
-          canvas.drawCircle(center, radius, pulsePaint);
-        }
+            ..strokeWidth = 1.6
+            ..color = Colors.white.withValues(alpha: 0.10),
+        );
+        canvas.drawCircle(
+          c,
+          16,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.2
+            ..color = Colors.white.withValues(alpha: 0.05),
+        );
       }
     }
   }
 
   @override
-  bool shouldRepaint(covariant _RouteDrawPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.pinScale != pinScale ||
-        oldDelegate.pulseProgress != pulseProgress;
-  }
+  bool shouldRepaint(covariant _RoutePainter old) =>
+      old.progress != progress || old.pinLanded != pinLanded;
 }
 
-/// Pin Overlay widget positioned over destination point
-class _PinOverlay extends StatelessWidget {
+/// Map pin matching the brand mock: gold teardrop frame + circular logo face.
+class _PinWidget extends StatelessWidget {
   final double progress;
-  final double pinDrop;
-  final Size graphicSize;
+  final double drop;
+  final Size size;
 
-  const _PinOverlay({
+  const _PinWidget({
     required this.progress,
-    required this.pinDrop,
-    required this.graphicSize,
+    required this.drop,
+    required this.size,
   });
+
+  // ViewBox 100 × 130 — classic tall location pin
+  static const pinW = 92.0;
+  static const pinH = 120.0;
+
+  // Circular face geometry (in pin local coords) — matches _mapPinPath head
+  static double get faceCx => pinW * 0.50;
+  static double get faceCy => pinH * (48 / 130); // center of rounded head
+  static double get holeR => pinW * 0.30; // large black circle, thick gold rim
 
   @override
   Widget build(BuildContext context) {
-    // End position of path: (w * 0.50, h * 0.35)
-    final pinX = graphicSize.width * 0.50;
-    final pinY = graphicSize.height * 0.35;
+    final appear = ((progress - 0.40) / 0.22).clamp(0.0, 1.0);
+    if (appear <= 0) return const SizedBox.shrink();
 
-    final opacity = progress.clamp(0.0, 1.0);
-    final scale = pinDrop.clamp(0.0, 1.2);
-    final translateY = (1 - pinDrop.clamp(0.0, 1.0)) * -30.0;
+    final scale = drop.clamp(0.0, 1.12);
+    final lift = (1 - drop.clamp(0.0, 1.0)) * -40.0;
+
+    final logoD = holeR * 2;
+    final logoLeft = faceCx - holeR;
+    final logoTop = faceCy - holeR;
+
+    final x = size.width * _ex;
+    final y = size.height * _ey;
 
     return Positioned(
-      left: pinX - 32,
-      top: pinY - 64 + translateY,
+      left: x - pinW / 2,
+      top: y - pinH + lift,
       child: Opacity(
-        opacity: opacity,
+        opacity: (appear * scale.clamp(0.0, 1.0)).clamp(0.0, 1.0),
         child: Transform.scale(
           scale: scale,
           alignment: Alignment.bottomCenter,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.4),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
+          child: SizedBox(
+            width: pinW,
+            height: pinH,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Gold teardrop pin shell
+                CustomPaint(
+                  size: const Size(pinW, pinH),
+                  painter: _PinPainter(
+                    faceCx: faceCx,
+                    faceCy: faceCy,
+                    holeRadius: holeR,
+                  ),
                 ),
-                child: CustomPaint(
-                  painter: _MapPinPainter(),
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Color(0xFF050E17),
-                        ),
-                        child: ClipOval(
-                          child: Image.asset(
-                            'assets/images/foodeez-mark.png',
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(
-                              Icons.location_on,
-                              size: 20,
-                              color: Color(0xFFF0D48A),
+                // Logo in the circular face
+                Positioned(
+                  left: logoLeft,
+                  top: logoTop,
+                  width: logoD,
+                  height: logoD,
+                  child: ClipOval(
+                    child: ColoredBox(
+                      color: const Color(0xFF05080E),
+                      child: Image.asset(
+                        'assets/images/Rider_logo.png',
+                        width: logoD,
+                        height: logoD,
+                        fit: BoxFit.cover,
+                        alignment: const Alignment(0, -0.58),
+                        filterQuality: FilterQuality.high,
+                        gaplessPlayback: true,
+                        errorBuilder: (_, __, ___) => Center(
+                          child: Text(
+                            'F',
+                            style: AppText.display(
+                              size: logoD * 0.48,
+                              weight: FontWeight.w800,
+                              color: Colors.white,
                             ),
                           ),
                         ),
@@ -486,8 +449,8 @@ class _PinOverlay extends StatelessWidget {
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -495,36 +458,96 @@ class _PinOverlay extends StatelessWidget {
   }
 }
 
-/// Teardrop Map Pin painter
-class _MapPinPainter extends CustomPainter {
+/// Classic location-pin path — rounded head, long pointed tip.
+/// ViewBox logical units: 0..100 × 0..130
+Path _mapPinPath(Size size) {
+  final sx = size.width / 100.0;
+  final sy = size.height / 130.0;
+
+  // Clean teardrop matching the brand screenshot:
+  // near-circle head (0..100, ~0..96) tapering to a sharp tip at (50, 128)
+  return Path()
+    ..moveTo(50 * sx, 2 * sy)
+    // Top-left quarter → left side of head
+    ..cubicTo(27 * sx, 2 * sy, 8 * sx, 18 * sy, 8 * sx, 48 * sy)
+    // Left shoulder tapering down into the point
+    ..cubicTo(8 * sx, 72 * sy, 32 * sx, 100 * sy, 50 * sx, 128 * sy)
+    // Right shoulder up from the point
+    ..cubicTo(68 * sx, 100 * sy, 92 * sx, 72 * sy, 92 * sx, 48 * sy)
+    // Right head → top
+    ..cubicTo(92 * sx, 18 * sy, 73 * sx, 2 * sy, 50 * sx, 2 * sy)
+    ..close();
+}
+
+/// Gold pin body with circular logo cutout + soft tip shadow.
+class _PinPainter extends CustomPainter {
+  final double faceCx;
+  final double faceCy;
+  final double holeRadius;
+
+  const _PinPainter({
+    required this.faceCx,
+    required this.faceCy,
+    required this.holeRadius,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
+    final pin = _mapPinPath(size);
+    final center = Offset(faceCx, faceCy);
 
-    // Map pin teardrop shape
-    final path = Path()
-      ..moveTo(w * 0.5, h * 0.98)
-      ..cubicTo(w * 0.15, h * 0.65, 0, h * 0.45, 0, h * 0.35)
-      ..cubicTo(0, h * 0.15, w * 0.22, 0, w * 0.5, 0)
-      ..cubicTo(w * 0.78, 0, w, h * 0.15, w, h * 0.35)
-      ..cubicTo(w, h * 0.45, w * 0.85, h * 0.65, w * 0.5, h * 0.98)
-      ..close();
+    final hole = Path()
+      ..addOval(Rect.fromCircle(center: center, radius: holeRadius));
 
-    // Fill pin with gold gradient
-    final fillPaint = Paint()
-      ..shader = ui.Gradient.linear(
-        Offset.zero,
-        Offset(w, h),
-        [
-          const Color(0xFFF0D48A),
-          const Color(0xFFE8C767),
-          const Color(0xFFB8862F),
-        ],
-      );
-    canvas.drawPath(path, fillPaint);
+    final shell = Path.combine(PathOperation.difference, pin, hole);
+
+    // Drop shadow under pin body
+    canvas.drawPath(
+      pin.shift(const Offset(0, 3)),
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.38)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+    );
+
+    // Gold gradient shell (thick frame like the reference)
+    canvas.drawPath(
+      shell,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(size.width * 0.2, 0),
+          Offset(size.width * 0.8, size.height),
+          const [
+            Color(0xFFF5E0A0),
+            Color(0xFFE2C46A),
+            Color(0xFFC9A227),
+            Color(0xFFA67C1A),
+          ],
+          const [0.0, 0.35, 0.7, 1.0],
+        ),
+    );
+
+    // Soft highlight on upper gold rim
+    canvas.drawCircle(
+      center.translate(0, -holeRadius * 0.15),
+      holeRadius + 4,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..color = Colors.white.withValues(alpha: 0.12)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+    );
+
+    // Ensure hole reads as solid dark (behind logo widget)
+    canvas.drawCircle(
+      center,
+      holeRadius,
+      Paint()..color = const Color(0xFF05080E),
+    );
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _PinPainter old) =>
+      old.faceCx != faceCx ||
+      old.faceCy != faceCy ||
+      old.holeRadius != holeRadius;
 }

@@ -41,6 +41,7 @@ dependencies:
   url_launcher: ^6.3.1
   http: ^1.6.0
   socket_io_client: ^2.0.3
+  flutter_native_splash: ^2.4.4
 
 dev_dependencies:
   flutter_test:
@@ -69,12 +70,15 @@ flutter_launcher_icons:
     theme_color: "#112D46"
 
 flutter_native_splash:
-  color: "#0A1B2E"
-  image: assets/images/foodeez-full.png
+  color: "#0A0E14"
+  image: assets/images/Rider_logo.png
   android_12:
-    color: "#0A1B2E"
-    image: assets/images/foodeez-mark.png
-    icon_background_color: "#0A1B2E"
+    color: "#0A0E14"
+    image: assets/images/Rider_logo.png
+    icon_background_color: "#0A0E14"
+  ios: true
+  web: false
+  fullscreen: true
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
