@@ -69,12 +69,13 @@ flutter_launcher_icons:
     background_color: "#FFFFFF"
     theme_color: "#112D46"
 
+# Native launch is solid navy only — Flutter SplashScreen owns branding.
 flutter_native_splash:
   color: "#0A0E14"
-  image: assets/images/Rider_logo.png
+  image: assets/images/native_splash_blank.png
   android_12:
     color: "#0A0E14"
-    image: assets/images/Rider_logo.png
+    image: assets/images/native_splash_blank.png
     icon_background_color: "#0A0E14"
   ios: true
   web: false
@@ -96,6 +97,7 @@ flutter:
     - assets/images/foodeez-mark.png
     - assets/images/foodeez-full.png
     - assets/images/Rider_logo.png
+    - assets/images/native_splash_blank.png
     - assets/images/rider-bike-marker.png
 
   fonts:
