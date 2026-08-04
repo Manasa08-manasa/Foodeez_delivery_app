@@ -308,6 +308,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               ScreenHeader(
                 title: 'Sign up to deliver',
                 onBack: _goBackAStep,
+                leadingSpace: 4,
               ),
 
               Padding(

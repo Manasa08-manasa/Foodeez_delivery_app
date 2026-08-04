@@ -24,20 +24,37 @@ class BackButtonChip extends StatelessWidget {
 }
 
 /// Standard pushed-screen header: back button + title.
+///
+/// [leadingSpace] adds extra inset to the left of the back button
+/// (on top of any parent padding).
 class ScreenHeader extends StatelessWidget {
   final String title;
   final VoidCallback onBack;
-  const ScreenHeader({super.key, required this.title, required this.onBack});
+  final double leadingSpace;
+
+  const ScreenHeader({
+    super.key,
+    required this.title,
+    required this.onBack,
+    this.leadingSpace = 0,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: Responsive.screenPadding(context, horizontal: 20, vertical: 4).copyWith(bottom: 12),
+      padding: EdgeInsets.only(left: leadingSpace, top: 4, bottom: 12),
       child: Row(
         children: [
           BackButtonChip(onTap: onBack),
-          const SizedBox(width: 12),
-          Text(title, style: AppText.display(size: 20)),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Text(
+              title,
+              style: AppText.display(size: 20),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
