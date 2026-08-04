@@ -186,7 +186,7 @@ class AppState extends ChangeNotifier {
   void toRatings() => go('ratings');
   void toHelp() => go('help');
 
-  void logout() {
+  void _resetSessionState() {
     _locationTimer?.cancel();
     _assignmentPollTimer?.cancel();
     _activeRidersPollTimer?.cancel();
@@ -218,6 +218,15 @@ class AppState extends ChangeNotifier {
     }
     accountStatus = AccountStatus.active;
     stack = ['login'];
+  }
+
+  void logout() {
+    _resetSessionState();
+    notifyListeners();
+  }
+
+  void deleteAccount() {
+    _resetSessionState();
     notifyListeners();
   }
 

@@ -304,6 +304,7 @@ class _RoutePainter extends CustomPainter {
               Color(0xFFE2C46A),
               Color(0xFFC9A227),
             ],
+            const [0.0, 0.5, 1.0],
           ),
       );
 

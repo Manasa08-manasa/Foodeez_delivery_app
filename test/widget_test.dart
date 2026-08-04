@@ -239,6 +239,27 @@ void main() {
     expect(app.online, isTrue);
   });
 
+  testWidgets('Delete account asks for confirmation and returns to login', (WidgetTester tester) async {
+    final container = await pumpApp(tester);
+    await tester.pump(const Duration(milliseconds: 3600));
+    final app = container.read(appControllerProvider);
+    app.tab('profile');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.ensureVisible(find.text('Delete account').last);
+    await tester.tap(find.text('Delete account').last);
+    await tester.pump();
+
+    expect(find.text('Delete your account?'), findsOneWidget);
+    expect(find.text('This will sign you out and return you to the login screen.'), findsOneWidget);
+
+    await tester.tap(find.text('Delete account').last);
+    await tester.pump();
+
+    expect(app.screen, 'login');
+  });
+
   testWidgets('Back buttons on pushed sub-screens hug the top', (WidgetTester tester) async {
     final container = await pumpApp(tester);
     final app = container.read(appControllerProvider);

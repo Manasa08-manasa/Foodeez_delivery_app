@@ -147,7 +147,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               Center(
                 child: Padding(
                   padding: const EdgeInsets.only(top: 18),
-                  child: GestureDetector(onTap: app.logout, child: Text('Log out', style: AppText.body(size: 13, weight: FontWeight.w800, color: AppColors.red))),
+                  child: Column(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (dialogContext) => AlertDialog(
+                              title: const Text('Delete your account?'),
+                              content: const Text('This will sign you out and return you to the login screen.'),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.of(dialogContext).pop();
+                                    app.deleteAccount();
+                                  },
+                                  style: TextButton.styleFrom(foregroundColor: AppColors.red),
+                                  child: const Text('Delete account'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        child: Text('Delete account', style: AppText.body(size: 13, weight: FontWeight.w800, color: AppColors.red)),
+                      ),
+                      const SizedBox(height: 12),
+                      GestureDetector(onTap: app.logout, child: Text('Log out', style: AppText.body(size: 13, weight: FontWeight.w800, color: AppColors.red))),
+                    ],
+                  ),
                 ),
               ),
             ],
